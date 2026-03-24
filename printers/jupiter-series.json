@@ -1,0 +1,62 @@
+[
+  {
+    "presetId": "elegoo-jupiter-ctb",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Jupiter",
+    "name": "Jupiter",
+    "imageAssetPath": "./assets/jupiter/jupiter.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Jupiter",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 300
+    },
+    "pixelSize": {
+      "x": 51,
+      "y": 51
+    },
+    "display": {
+      "resolutionX": 5448,
+      "resolutionY": 3064,
+      "outputFormat": ".ctb",
+      "formatVersion": "v5",
+      "settingsMode": "twostage",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  },
+  {
+    "presetId": "elegoo-jupiter-se-ctb",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Jupiter",
+    "name": "Jupiter SE",
+    "imageAssetPath": "./assets/jupiter/jupiter-se.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Jupiter",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 300
+    },
+    "pixelSize": {
+      "x": 51,
+      "y": 51
+    },
+    "display": {
+      "resolutionX": 5448,
+      "resolutionY": 3064,
+      "outputFormat": ".ctb",
+      "formatVersion": "v5",
+      "settingsMode": "twostage",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  }
+]

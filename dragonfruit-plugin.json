@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "elegoo-printer-profiles",
+  "name": "ELEGOO Printer Profiles",
+  "version": "0.2.0",
+  "description": "Simple DragonFruit plugin that adds curated ELEGOO printer presets for CTB workflows.",
+  "author": "Open Resin Alliance",
+  "homepage": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo",
+  "printerPresetPaths": [
+    "printers/mars-series.json",
+    "printers/saturn-series.json",
+    "printers/jupiter-series.json"
+  ]
+}
