@@ -211,7 +211,7 @@
   },
   {
     "presetId": "elegoo-mars-5-ultra-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 5 Ultra",
@@ -234,7 +234,7 @@
       "resolutionY": 4320,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
-      "settingsMode": "twostage",
+      "settingsMode": "simple",
       "mirrorX": true,
       "mirrorY": false
     }
