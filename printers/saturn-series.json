@@ -120,36 +120,6 @@
     }
   },
   {
-    "presetId": "elegoo-saturn-4-ctb",
-    "profileVersion": 1,
-    "manufacturer": "ELEGOO",
-    "family": "Saturn",
-    "name": "Saturn 4",
-    "imageAssetPath": "./assets/saturn/saturn-4.png",
-    "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Saturn 4",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 220
-    },
-    "pixelSize": {
-      "x": 19,
-      "y": 24
-    },
-    "display": {
-      "resolutionX": 11520,
-      "resolutionY": 5120,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
-      "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
     "presetId": "elegoo-saturn-4-ultra-ctb",
     "profileVersion": 2,
     "manufacturer": "ELEGOO",

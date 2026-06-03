@@ -180,36 +180,6 @@
     }
   },
   {
-    "presetId": "elegoo-mars-5-ctb",
-    "profileVersion": 1,
-    "manufacturer": "ELEGOO",
-    "family": "Mars",
-    "name": "Mars 5",
-    "imageAssetPath": "./assets/mars/mars-5.png",
-    "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Mars 5",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 165
-    },
-    "pixelSize": {
-      "x": 35,
-      "y": 35
-    },
-    "display": {
-      "resolutionX": 4098,
-      "resolutionY": 2560,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
-      "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
     "presetId": "elegoo-mars-5-ultra-ctb",
     "profileVersion": 2,
     "manufacturer": "ELEGOO",
