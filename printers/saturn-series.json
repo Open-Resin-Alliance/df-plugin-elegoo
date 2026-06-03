@@ -181,7 +181,7 @@
   },
   {
     "presetId": "elegoo-saturn-4-ultra-16k-ctb",
-    "profileVersion": 2,
+    "profileVersion": 3,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4 Ultra 16K",
@@ -198,6 +198,10 @@
     "pixelSize": {
       "x": 14,
       "y": 19
+    },
+    "bitDepth": {
+      "bits": 3,
+      "description": "3-bit color depth, suboptimal for grayscale"
     },
     "display": {
       "resolutionX": 15120,
