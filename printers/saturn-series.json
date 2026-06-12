@@ -120,7 +120,7 @@
     }
   },
   {
-    "presetId": "elegoo-saturn-4-ctb",
+    "presetId": "elegoo-saturn-4-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
@@ -142,8 +142,7 @@
     "display": {
       "resolutionX": 11520,
       "resolutionY": 5120,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
+      "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false

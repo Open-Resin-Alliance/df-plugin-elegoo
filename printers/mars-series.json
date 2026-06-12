@@ -60,7 +60,7 @@
     }
   },
   {
-    "presetId": "elegoo-mars-4-ctb",
+    "presetId": "elegoo-mars-4-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
@@ -82,15 +82,14 @@
     "display": {
       "resolutionX": 8520,
       "resolutionY": 4320,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
+      "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
     }
   },
   {
-    "presetId": "elegoo-mars-4-dlp-ctb",
+    "presetId": "elegoo-mars-4-dlp-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
@@ -112,15 +111,14 @@
     "display": {
       "resolutionX": 2560,
       "resolutionY": 1440,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
+      "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
     }
   },
   {
-    "presetId": "elegoo-mars-4-max-ctb",
+    "presetId": "elegoo-mars-4-max-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
@@ -142,8 +140,7 @@
     "display": {
       "resolutionX": 5760,
       "resolutionY": 3600,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
+      "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
@@ -180,7 +177,7 @@
     }
   },
   {
-    "presetId": "elegoo-mars-5-ctb",
+    "presetId": "elegoo-mars-5-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
@@ -202,8 +199,7 @@
     "display": {
       "resolutionX": 4098,
       "resolutionY": 2560,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
+      "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
