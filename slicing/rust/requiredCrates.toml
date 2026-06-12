@@ -1,0 +1,11 @@
+[dependencies]
+# No additional crates needed; goo_preview reuses png and base64 already in the engine.
+
+[optional-dependencies]
+
+[features]
+default = []
+
+[notes]
+purpose = "Goo big-endian format encoding with RGB565 previews and custom RLE"
+minimum-rust = "1.75"

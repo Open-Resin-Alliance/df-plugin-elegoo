@@ -1,0 +1,279 @@
+{
+  "displayName": "Goo Resin Settings",
+  "replacesDefaultMaterialSettings": true,
+  "tabs": [
+    { "id": "simple", "title": "Simple", "order": 10 },
+    { "id": "twostage", "title": "Two-Stage", "order": 20 }
+  ],
+  "sections": [
+    { "id": "burn-in", "title": "Burn In Layers", "tabId": "simple", "order": 10 },
+    { "id": "normal", "title": "Normal Layers", "tabId": "simple", "order": 20 },
+    { "id": "timing", "title": "Timing", "tabId": "simple", "order": 30 },
+    { "id": "light", "title": "Light Settings", "tabId": "simple", "order": 40 },
+    { "id": "twostage-burn-in-motion", "title": "Burn-In Two-Stage Motion", "tabId": "twostage", "order": 10 },
+    { "id": "twostage-motion", "title": "Two-Stage Motion", "tabId": "twostage", "order": 20 }
+  ],
+  "cards": [
+    { "id": "burn-in-settings", "title": "Burn In Layers", "tabId": "simple", "sectionId": "burn-in", "order": 10 },
+    { "id": "normal-settings", "title": "Normal Layers", "tabId": "simple", "sectionId": "normal", "order": 20 },
+    { "id": "timing-settings", "title": "Timing", "tabId": "simple", "sectionId": "timing", "order": 30 },
+    { "id": "light-settings", "title": "Light Settings", "tabId": "simple", "sectionId": "light", "order": 40 },
+    { "id": "twostage-burn-in-settings", "title": "Burn-In Two-Stage Motion", "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "order": 10 },
+    { "id": "twostage-settings", "title": "Two-Stage Motion", "tabId": "twostage", "sectionId": "twostage-motion", "order": 20 }
+  ],
+  "fields": [
+    {
+      "key": "layerHeightMm",
+      "label": "Layer Thickness (mm)",
+      "kind": "number",
+      "defaultValue": 0.05,
+      "min": 0.001,
+      "max": 1,
+      "step": 0.001,
+      "placement": { "tabId": "simple", "sectionId": "normal", "cardId": "normal-settings", "order": 10 },
+      "metadataPath": "material.layerHeightMm"
+    },
+    {
+      "key": "bottomLayerCount",
+      "label": "Burn-in Layers",
+      "kind": "integer",
+      "defaultValue": 5,
+      "min": 0,
+      "max": 200,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "burn-in-settings", "order": 10 },
+      "metadataPath": "material.bottomLayerCount"
+    },
+    {
+      "key": "bottomExposureSec",
+      "label": "Burn-in Exposure (s)",
+      "kind": "number",
+      "defaultValue": 25,
+      "min": 0,
+      "max": 300,
+      "step": 0.1,
+      "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "burn-in-settings", "order": 20 },
+      "metadataPath": "material.bottomExposureSec"
+    },
+    {
+      "key": "transitionLayerCount",
+      "label": "Transition Layers",
+      "kind": "integer",
+      "defaultValue": 5,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "burn-in-settings", "order": 25 },
+      "metadataPath": "material.transitionLayerCount"
+    },
+    {
+      "key": "bottomLiftDistanceMm",
+      "label": "Burn-in Lift Distance (mm)",
+      "kind": "number",
+      "defaultValue": 6,
+      "min": 0,
+      "max": 50,
+      "step": 0.01,
+      "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "burn-in-settings", "order": 30 },
+      "metadataPath": "material.bottomLiftDistanceMm"
+    },
+    {
+      "key": "bottomLiftSpeedMmMin",
+      "label": "Burn-in Lift Speed (mm/min)",
+      "kind": "number",
+      "defaultValue": 30,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "burn-in-settings", "order": 40 },
+      "metadataPath": "material.bottomLiftSpeedMmMin"
+    },
+    {
+      "key": "bottomRetractSpeedMmMin",
+      "label": "Burn-in Retract Speed (mm/min)",
+      "kind": "number",
+      "defaultValue": 90,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "burn-in-settings", "order": 50 },
+      "metadataPath": "material.bottomRetractSpeedMmMin"
+    },
+    {
+      "key": "normalExposureSec",
+      "label": "Normal Exposure (s)",
+      "kind": "number",
+      "defaultValue": 2,
+      "min": 0,
+      "max": 120,
+      "step": 0.01,
+      "placement": { "tabId": "simple", "sectionId": "normal", "cardId": "normal-settings", "order": 20 },
+      "metadataPath": "material.normalExposureSec"
+    },
+    {
+      "key": "liftDistanceMm",
+      "label": "Lift Distance (mm)",
+      "kind": "number",
+      "defaultValue": 6,
+      "min": 0,
+      "max": 50,
+      "step": 0.01,
+      "placement": { "tabId": "simple", "sectionId": "normal", "cardId": "normal-settings", "order": 30 },
+      "metadataPath": "material.liftDistanceMm"
+    },
+    {
+      "key": "liftSpeedMmMin",
+      "label": "Lift Speed (mm/min)",
+      "kind": "number",
+      "defaultValue": 60,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "normal", "cardId": "normal-settings", "order": 40 },
+      "metadataPath": "material.liftSpeedMmMin"
+    },
+    {
+      "key": "retractSpeedMmMin",
+      "label": "Retract Speed (mm/min)",
+      "kind": "number",
+      "defaultValue": 150,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "normal", "cardId": "normal-settings", "order": 50 },
+      "metadataPath": "material.retractSpeedMmMin"
+    },
+    {
+      "key": "lightOffDelaySec",
+      "label": "Light-off Delay (s)",
+      "kind": "number",
+      "defaultValue": 1,
+      "min": 0,
+      "max": 120,
+      "step": 0.01,
+      "placement": { "tabId": "simple", "sectionId": "timing", "cardId": "timing-settings", "order": 10 },
+      "metadataPath": "goo.lightOffDelaySec"
+    },
+    {
+      "key": "projectorPwmPercent",
+      "label": "Projector PWM (%)",
+      "kind": "number",
+      "defaultValue": 100,
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "placement": { "tabId": "simple", "sectionId": "light", "cardId": "light-settings", "order": 10 },
+      "metadataPath": "goo.projectorPwmPercent"
+    },
+    {
+      "key": "bottomLiftDistance2Mm",
+      "label": "Burn-in Lift Distance 2 (mm)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 50,
+      "step": 0.01,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 10 },
+      "metadataPath": "material.bottomLiftDistance2Mm"
+    },
+    {
+      "key": "bottomLiftSpeed2MmMin",
+      "label": "Burn-in Lift Speed 2 (mm/min)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 20 },
+      "metadataPath": "material.bottomLiftSpeed2MmMin"
+    },
+    {
+      "key": "bottomRetractDistance2Mm",
+      "label": "Burn-in Retract Distance 2 (mm)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 50,
+      "step": 0.01,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 30 },
+      "metadataPath": "material.bottomRetractDistance2Mm"
+    },
+    {
+      "key": "bottomRetractSpeed2MmMin",
+      "label": "Burn-in Retract Speed 2 (mm/min)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 40 },
+      "metadataPath": "material.bottomRetractSpeed2MmMin"
+    },
+    {
+      "key": "liftDistance2Mm",
+      "label": "Lift Distance 2 (mm)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 50,
+      "step": 0.01,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 10 },
+      "metadataPath": "material.liftDistance2Mm"
+    },
+    {
+      "key": "liftSpeed2MmMin",
+      "label": "Lift Speed 2 (mm/min)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 20 },
+      "metadataPath": "material.liftSpeed2MmMin"
+    },
+    {
+      "key": "retractDistance2Mm",
+      "label": "Retract Distance 2 (mm)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 50,
+      "step": 0.01,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 30 },
+      "metadataPath": "material.retractDistance2Mm"
+    },
+    {
+      "key": "retractSpeed2MmMin",
+      "label": "Retract Speed 2 (mm/min)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 40 },
+      "metadataPath": "material.retractSpeed2MmMin"
+    },
+    {
+      "key": "waitTimeBeforeCureSec",
+      "label": "Wait Before Cure (s)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 120,
+      "step": 0.01,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 50 },
+      "metadataPath": "goo.waitTimeBeforeCureSec"
+    },
+    {
+      "key": "waitTimeAfterLiftSec",
+      "label": "Wait After Lift (s)",
+      "kind": "number",
+      "defaultValue": 0,
+      "min": 0,
+      "max": 120,
+      "step": 0.01,
+      "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 60 },
+      "metadataPath": "goo.waitTimeAfterLiftSec"
+    }
+  ]
+}
