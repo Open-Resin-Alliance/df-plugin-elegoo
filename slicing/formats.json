@@ -1,0 +1,10 @@
+{
+  "Goo": {
+    "extensions": [
+      ".goo"
+    ],
+    "displayName": "Goo (Elegoo/Phrozen)",
+    "version": "V3.0",
+    "notes": "Big-endian raw-mask/RLE container format used by Elegoo Saturn 4 and compatible printers"
+  }
+}
