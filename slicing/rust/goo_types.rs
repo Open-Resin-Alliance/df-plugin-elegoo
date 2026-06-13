@@ -3,18 +3,6 @@ pub(super) const DEFAULT_MACHINE_TYPE: &str = "DLP";
 pub(super) const DEFAULT_PROFILE_NAME: &str = "DragonFruit Profile";
 pub(super) const DEFAULT_BINARY_THRESHOLD: u8 = 127;
 
-pub(super) const GOO_SMALL_PREVIEW_W: u32 = 116;
-pub(super) const GOO_SMALL_PREVIEW_H: u32 = 116;
-pub(super) const GOO_LARGE_PREVIEW_W: u32 = 290;
-pub(super) const GOO_LARGE_PREVIEW_H: u32 = 290;
-
-/// Actual display dimensions the printer stretches previews to.
-/// Used to pre-compensate so content appears undistorted after stretch.
-pub(super) const GOO_SMALL_DISPLAY_W: u32 = 200;
-pub(super) const GOO_SMALL_DISPLAY_H: u32 = 125;
-pub(super) const GOO_LARGE_DISPLAY_W: u32 = 400;
-pub(super) const GOO_LARGE_DISPLAY_H: u32 = 300;
-
 pub(super) const GOO_LAYER_MAGIC: u8 = 0x55;
 pub(super) const GOO_CRLF: [u8; 2] = [0x0D, 0x0A];
 pub(super) const GOO_FILE_VERSION: &[u8; 4] = b"V1.2";

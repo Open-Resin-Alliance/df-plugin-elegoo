@@ -6,6 +6,13 @@ const SMALL_H: usize = 116;
 const LARGE_W: usize = 290;
 const LARGE_H: usize = 290;
 
+// Actual pixel dimensions the printer renders previews at.
+// The printer stretches stored pixels to fill these, so we pre-compensate.
+const SMALL_DISPLAY_W: usize = 200;
+const SMALL_DISPLAY_H: usize = 125;
+const LARGE_DISPLAY_W: usize = 400;
+const LARGE_DISPLAY_H: usize = 300;
+
 pub(super) struct GooPreviewBlobs {
     pub small: Vec<u8>,
     pub large: Vec<u8>,
@@ -51,8 +58,8 @@ fn decode_and_build(b64: &str) -> Result<GooPreviewBlobs, SlicerV3Error> {
 
     let (cropped, cw, ch) = crop_transparent_border(&rgba, src_w, src_h);
 
-    let small_rgb = resize_and_blend_rgba_to_rgb_nearest(&cropped, cw, ch, SMALL_W, SMALL_H);
-    let large_rgb = resize_and_blend_rgba_to_rgb_nearest(&cropped, cw, ch, LARGE_W, LARGE_H);
+    let small_rgb = render_for_display_compensated(&cropped, cw, ch, SMALL_W, SMALL_H, SMALL_DISPLAY_W, SMALL_DISPLAY_H);
+    let large_rgb = render_for_display_compensated(&cropped, cw, ch, LARGE_W, LARGE_H, LARGE_DISPLAY_W, LARGE_DISPLAY_H);
 
     Ok(GooPreviewBlobs {
         small: rgb_to_rgb565_be(&small_rgb, SMALL_W, SMALL_H),
@@ -177,31 +184,49 @@ fn crop_transparent_border(rgba: &[u8], w: usize, h: usize) -> (Vec<u8>, usize, 
     (out, cw, ch)
 }
 
-fn resize_and_blend_rgba_to_rgb_nearest(
+/// Render `src` into a `dst_w × dst_h` stored image with display-stretch compensation.
+///
+/// The printer will stretch the stored `dst_w × dst_h` pixels to `display_w × display_h`.
+/// To compensate, each stored pixel is mapped through display space first: it represents
+/// the source content that would appear at that location in the stretched display — so
+/// the stored image is pre-distorted in the inverse of the printer's stretch.
+fn render_for_display_compensated(
     rgba: &[u8],
     src_w: usize,
     src_h: usize,
     dst_w: usize,
     dst_h: usize,
+    display_w: usize,
+    display_h: usize,
 ) -> Vec<u8> {
     if src_w == 0 || src_h == 0 {
         return vec![0u8; dst_w * dst_h * 3];
     }
 
-    // Fit src into dst maintaining aspect ratio, center it on black background
-    let scale = (dst_w as f32 / src_w as f32).min(dst_h as f32 / src_h as f32);
-    let fit_w = ((src_w as f32 * scale).round() as usize).max(1);
-    let fit_h = ((src_h as f32 * scale).round() as usize).max(1);
-    let off_x = (dst_w - fit_w) / 2;
-    let off_y = (dst_h - fit_h) / 2;
+    // How the source fits (letterboxed/pillarboxed) inside the display canvas.
+    let scale = (display_w as f32 / src_w as f32).min(display_h as f32 / src_h as f32);
+    let fit_w = src_w as f32 * scale;
+    let fit_h = src_h as f32 * scale;
+    let off_x = (display_w as f32 - fit_w) / 2.0;
+    let off_y = (display_h as f32 - fit_h) / 2.0;
 
     let mut out = vec![0u8; dst_w * dst_h * 3];
 
-    for dst_y in 0..fit_h {
-        let src_y = ((dst_y as f32 / fit_h as f32) * src_h as f32) as usize;
+    for dst_y in 0..dst_h {
+        // Centre-of-pixel mapping from stored → display space
+        let disp_y = (dst_y as f32 + 0.5) * display_h as f32 / dst_h as f32;
+        if disp_y < off_y || disp_y >= off_y + fit_h {
+            continue; // letterbox row — leave black
+        }
+        let src_y = (((disp_y - off_y) / fit_h) * src_h as f32) as usize;
         let src_y = src_y.min(src_h - 1);
-        for dst_x in 0..fit_w {
-            let src_x = ((dst_x as f32 / fit_w as f32) * src_w as f32) as usize;
+
+        for dst_x in 0..dst_w {
+            let disp_x = (dst_x as f32 + 0.5) * display_w as f32 / dst_w as f32;
+            if disp_x < off_x || disp_x >= off_x + fit_w {
+                continue; // pillarbox column — leave black
+            }
+            let src_x = (((disp_x - off_x) / fit_w) * src_w as f32) as usize;
             let src_x = src_x.min(src_w - 1);
 
             let si = (src_y * src_w + src_x) * 4;
@@ -210,15 +235,10 @@ fn resize_and_blend_rgba_to_rgb_nearest(
             let b = rgba[si + 2] as u32;
             let a = rgba[si + 3] as u32;
 
-            // Blend over black background
-            let r_out = ((r * a) / 255) as u8;
-            let g_out = ((g * a) / 255) as u8;
-            let b_out = ((b * a) / 255) as u8;
-
-            let di = ((off_y + dst_y) * dst_w + (off_x + dst_x)) * 3;
-            out[di] = r_out;
-            out[di + 1] = g_out;
-            out[di + 2] = b_out;
+            let di = (dst_y * dst_w + dst_x) * 3;
+            out[di]     = ((r * a) / 255) as u8;
+            out[di + 1] = ((g * a) / 255) as u8;
+            out[di + 2] = ((b * a) / 255) as u8;
         }
     }
 

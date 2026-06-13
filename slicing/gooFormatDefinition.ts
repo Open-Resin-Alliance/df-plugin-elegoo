@@ -1,9 +1,9 @@
 import type { SlicingFormatDefinition } from '@/features/slicing/formats/types';
 
 export const GOO_FORMAT_DEFINITION: SlicingFormatDefinition = {
-  id: 'goo.goo.v1',
+  id: 'goo.v1',
   outputFormat: '.goo',
-  displayName: 'Goo',
+  displayName: 'GOO',
   ownership: 'plugin',
   layerDataKind: 'raw-mask',
   pluginId: 'elegoo',
