@@ -13,6 +13,12 @@ const SMALL_DISPLAY_H: usize = 125;
 const LARGE_DISPLAY_W: usize = 400;
 const LARGE_DISPLAY_H: usize = 300;
 
+// Background gradient: dark dragonfruit purple → dark dragonfruit green (diagonal).
+// Matches CTB preview gradient so both formats share a consistent look.
+const GRADIENT_START: [u32; 3] = [32, 10, 42];
+const GRADIENT_END: [u32; 3] = [14, 34, 14];
+const BAYER4X4: [[i32; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+
 pub(super) struct GooPreviewBlobs {
     pub small: Vec<u8>,
     pub large: Vec<u8>,
@@ -29,9 +35,17 @@ pub(super) fn build_goo_previews(
             }
         }
     }
+    // No thumbnail — render gradient-only background using a 1×1 transparent pixel.
+    let transparent = [0u8, 0, 0, 0];
     Ok(GooPreviewBlobs {
-        small: blank_rgb565(SMALL_W, SMALL_H),
-        large: blank_rgb565(LARGE_W, LARGE_H),
+        small: rgb_to_rgb565_be(
+            &render_for_display_compensated(&transparent, 1, 1, SMALL_W, SMALL_H, SMALL_DISPLAY_W, SMALL_DISPLAY_H),
+            SMALL_W, SMALL_H,
+        ),
+        large: rgb_to_rgb565_be(
+            &render_for_display_compensated(&transparent, 1, 1, LARGE_W, LARGE_H, LARGE_DISPLAY_W, LARGE_DISPLAY_H),
+            LARGE_W, LARGE_H,
+        ),
     })
 }
 
@@ -186,10 +200,9 @@ fn crop_transparent_border(rgba: &[u8], w: usize, h: usize) -> (Vec<u8>, usize, 
 
 /// Render `src` into a `dst_w × dst_h` stored image with display-stretch compensation.
 ///
-/// The printer will stretch the stored `dst_w × dst_h` pixels to `display_w × display_h`.
-/// To compensate, each stored pixel is mapped through display space first: it represents
-/// the source content that would appear at that location in the stretched display — so
-/// the stored image is pre-distorted in the inverse of the printer's stretch.
+/// The gradient and dithering are computed in display space (before stretch compensation),
+/// so they appear undistorted on the printer. Each stored pixel maps through the printer's
+/// display canvas first, then back to source coords — pre-distorting the image inversely.
 fn render_for_display_compensated(
     rgba: &[u8],
     src_w: usize,
@@ -199,35 +212,52 @@ fn render_for_display_compensated(
     display_w: usize,
     display_h: usize,
 ) -> Vec<u8> {
-    if src_w == 0 || src_h == 0 {
-        return vec![0u8; dst_w * dst_h * 3];
-    }
-
     // How the source fits (letterboxed/pillarboxed) inside the display canvas.
-    let scale = (display_w as f32 / src_w as f32).min(display_h as f32 / src_h as f32);
+    let scale = if src_w == 0 || src_h == 0 {
+        0.0f32
+    } else {
+        (display_w as f32 / src_w as f32).min(display_h as f32 / src_h as f32)
+    };
     let fit_w = src_w as f32 * scale;
     let fit_h = src_h as f32 * scale;
     let off_x = (display_w as f32 - fit_w) / 2.0;
     let off_y = (display_h as f32 - fit_h) / 2.0;
 
+    let denom = (display_w + display_h).max(1) as u64;
+    let dither_u8 = |v: u32, d: i32| -> u8 {
+        ((v as i32 + (d - 8) * 3 / 8).clamp(0, 255)) as u8
+    };
+
     let mut out = vec![0u8; dst_w * dst_h * 3];
 
     for dst_y in 0..dst_h {
-        // Centre-of-pixel mapping from stored → display space
         let disp_y = (dst_y as f32 + 0.5) * display_h as f32 / dst_h as f32;
-        if disp_y < off_y || disp_y >= off_y + fit_h {
-            continue; // letterbox row — leave black
-        }
-        let src_y = (((disp_y - off_y) / fit_h) * src_h as f32) as usize;
-        let src_y = src_y.min(src_h - 1);
-
         for dst_x in 0..dst_w {
             let disp_x = (dst_x as f32 + 0.5) * display_w as f32 / dst_w as f32;
-            if disp_x < off_x || disp_x >= off_x + fit_w {
-                continue; // pillarbox column — leave black
+            let dither = BAYER4X4[dst_y & 3][dst_x & 3];
+
+            // Gradient in display space — matches CTB: diagonal purple→green
+            let t = ((disp_x as u64 + disp_y as u64) * 255 / denom) as u32;
+            let bg_r = (GRADIENT_START[0] * (255 - t) + GRADIENT_END[0] * t) / 255;
+            let bg_g = (GRADIENT_START[1] * (255 - t) + GRADIENT_END[1] * t) / 255;
+            let bg_b = (GRADIENT_START[2] * (255 - t) + GRADIENT_END[2] * t) / 255;
+
+            let di = (dst_y * dst_w + dst_x) * 3;
+
+            if scale == 0.0 || disp_x < off_x || disp_x >= off_x + fit_w
+                || disp_y < off_y || disp_y >= off_y + fit_h
+            {
+                // Letterbox / pillarbox — pure gradient
+                out[di]     = dither_u8(bg_r, dither);
+                out[di + 1] = dither_u8(bg_g, dither);
+                out[di + 2] = dither_u8(bg_b, dither);
+                continue;
             }
+
             let src_x = (((disp_x - off_x) / fit_w) * src_w as f32) as usize;
+            let src_y = (((disp_y - off_y) / fit_h) * src_h as f32) as usize;
             let src_x = src_x.min(src_w - 1);
+            let src_y = src_y.min(src_h - 1);
 
             let si = (src_y * src_w + src_x) * 4;
             let r = rgba[si] as u32;
@@ -235,10 +265,20 @@ fn render_for_display_compensated(
             let b = rgba[si + 2] as u32;
             let a = rgba[si + 3] as u32;
 
-            let di = (dst_y * dst_w + dst_x) * 3;
-            out[di]     = ((r * a) / 255) as u8;
-            out[di + 1] = ((g * a) / 255) as u8;
-            out[di + 2] = ((b * a) / 255) as u8;
+            if a == 255 {
+                out[di]     = r as u8;
+                out[di + 1] = g as u8;
+                out[di + 2] = b as u8;
+            } else if a == 0 {
+                out[di]     = dither_u8(bg_r, dither);
+                out[di + 1] = dither_u8(bg_g, dither);
+                out[di + 2] = dither_u8(bg_b, dither);
+            } else {
+                let inv_a = 255 - a;
+                out[di]     = dither_u8((r * a + bg_r * inv_a) / 255, dither);
+                out[di + 1] = dither_u8((g * a + bg_g * inv_a) / 255, dither);
+                out[di + 2] = dither_u8((b * a + bg_b * inv_a) / 255, dither);
+            }
         }
     }
 
@@ -258,19 +298,35 @@ fn rgb_to_rgb565_be(rgb: &[u8], w: usize, h: usize) -> Vec<u8> {
     out
 }
 
-fn blank_rgb565(w: usize, h: usize) -> Vec<u8> {
-    vec![0u8; w * h * 2]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn blank_preview_sizes() {
+    fn no_thumbnail_produces_correct_sizes() {
         let blobs = build_goo_previews(None).unwrap();
         assert_eq!(blobs.small.len(), SMALL_W * SMALL_H * 2);
         assert_eq!(blobs.large.len(), LARGE_W * LARGE_H * 2);
+    }
+
+    #[test]
+    fn no_thumbnail_renders_gradient_not_black() {
+        let blobs = build_goo_previews(None).unwrap();
+        // Gradient background means not all pixels are zero.
+        assert!(blobs.small.iter().any(|&b| b != 0));
+    }
+
+    #[test]
+    fn gradient_top_left_differs_from_bottom_right() {
+        // Diagonal gradient must vary across the display canvas.
+        let rgb = render_for_display_compensated(
+            &[0, 0, 0, 0], 1, 1,
+            SMALL_W, SMALL_H, SMALL_DISPLAY_W, SMALL_DISPLAY_H,
+        );
+        let top_left = [rgb[0], rgb[1], rgb[2]];
+        let last = (SMALL_W * SMALL_H - 1) * 3;
+        let bottom_right = [rgb[last], rgb[last + 1], rgb[last + 2]];
+        assert_ne!(top_left, bottom_right);
     }
 
     #[test]
