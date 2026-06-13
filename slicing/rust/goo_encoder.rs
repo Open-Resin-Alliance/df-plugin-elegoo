@@ -3,7 +3,8 @@ use crate::types::SliceJobV3;
 use serde_json::Value;
 
 use super::goo_layout::{
-    goo_rle_encode, push_crlf, push_f32_be, push_str_fixed, push_u16_be, push_u32_be, push_u8,
+    encode_single_goo_layer_from_raw_mask, push_crlf, push_f32_be, push_str_fixed, push_u16_be,
+    push_u32_be, push_u8,
 };
 use super::goo_metadata::{
     compute_print_time_seconds, parse_goo_build_model_from_job, parse_software_info_from_metadata,
@@ -15,30 +16,31 @@ use super::goo_types::{
     GOO_HEADER_SIZE,
 };
 
-/// Prepare all layers from raw 8-bit masks, encoding each to Goo RLE.
-pub(super) fn prepare_layers_for_goo(
+pub(super) fn prepare_layers_for_goo_with_progress(
     raw_masks: &[Vec<u8>],
     is_anti_aliased: bool,
     threshold: u8,
     layer_height_mm: f32,
     bottom_layer_count: u32,
+    on_progress: Option<&dyn Fn(u32, u32)>,
 ) -> Vec<GooPreparedLayer> {
+    let total = raw_masks.len() as u32;
     raw_masks
         .iter()
         .enumerate()
         .map(|(layer_id, mask)| {
-            let pixels: Vec<u8> = if is_anti_aliased {
-                mask.clone()
-            } else {
-                mask.iter()
-                    .map(|&p| if p > threshold { 0xFF } else { 0x00 })
-                    .collect()
-            };
-            GooPreparedLayer {
-                position_z_mm: (layer_id as f32 + 1.0) * layer_height_mm,
-                is_bottom: (layer_id as u32) < bottom_layer_count,
-                encoded: goo_rle_encode(&pixels),
+            let layer = encode_single_goo_layer_from_raw_mask(
+                layer_id,
+                mask,
+                is_anti_aliased,
+                threshold,
+                layer_height_mm,
+                bottom_layer_count,
+            );
+            if let Some(cb) = on_progress {
+                cb(layer_id as u32 + 1, total.max(1));
             }
+            layer
         })
         .collect()
 }

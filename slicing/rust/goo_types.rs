@@ -24,6 +24,7 @@ pub(super) const GOO_HEADER_SIZE: u32 = 195477;
 
 #[derive(Debug, Clone)]
 pub(super) struct GooPreparedLayer {
+    pub index: usize,
     pub position_z_mm: f32,
     pub is_bottom: bool,
     /// RLE bytes: 0x55 magic + chunks + one's-complement checksum.

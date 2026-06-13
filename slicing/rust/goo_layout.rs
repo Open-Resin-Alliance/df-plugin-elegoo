@@ -1,4 +1,4 @@
-use super::goo_types::{GOO_CRLF, GOO_LAYER_MAGIC};
+use super::goo_types::{GooPreparedLayer, GOO_CRLF, GOO_LAYER_MAGIC};
 
 #[inline]
 pub(super) fn push_u8(out: &mut Vec<u8>, val: u8) {
@@ -74,7 +74,7 @@ pub(super) fn goo_rle_encode(pixels: &[u8]) -> Vec<u8> {
     out
 }
 
-fn push_goo_run(out: &mut Vec<u8>, chunk_type: u8, run_len: u32, color: u8) {
+pub(super) fn push_goo_run(out: &mut Vec<u8>, chunk_type: u8, run_len: u32, color: u8) {
     let low_nibble = (run_len & 0xF) as u8;
 
     if run_len <= 15 {
@@ -95,6 +95,30 @@ fn push_goo_run(out: &mut Vec<u8>, chunk_type: u8, run_len: u32, color: u8) {
 
     if chunk_type == 0x01 {
         out.push(color);
+    }
+}
+
+pub(super) fn encode_single_goo_layer_from_raw_mask(
+    layer_index: usize,
+    raw_mask: &[u8],
+    is_anti_aliased: bool,
+    threshold: u8,
+    layer_height_mm: f32,
+    bottom_layer_count: u32,
+) -> GooPreparedLayer {
+    let pixels: Vec<u8> = if is_anti_aliased {
+        raw_mask.to_vec()
+    } else {
+        raw_mask
+            .iter()
+            .map(|&p| if p > threshold { 0xFF } else { 0x00 })
+            .collect()
+    };
+    GooPreparedLayer {
+        index: layer_index,
+        position_z_mm: (layer_index as f32 + 1.0) * layer_height_mm,
+        is_bottom: (layer_index as u32) < bottom_layer_count,
+        encoded: goo_rle_encode(&pixels),
     }
 }
 
