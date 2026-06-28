@@ -219,6 +219,17 @@ fn write_goo_header(
     push_u16_be(out, timing.transition_layer_count);   // [61]  2 bytes TransitionLayerCount
 }
 
+//TODO generalize function
+fn interpolate_transition_layer_exposure(
+    layer: &GooPreparedLayer,
+    timing: &GooTimingModel
+) -> f32 {
+    return timing.bottom_exposure_sec 
+        - (timing.bottom_exposure_sec - timing.normal_exposure_sec) 
+            / (timing.transition_layer_count as f32) 
+            * (layer.index as u32 - timing.bottom_layer_count + 1) as f32;
+}
+
 fn write_goo_layer(out: &mut Vec<u8>, layer: &GooPreparedLayer, timing: &GooTimingModel) {
     let (
         exposure, light_off, w_after_cure, w_after_lift, w_before_cure,
@@ -244,7 +255,9 @@ fn write_goo_layer(out: &mut Vec<u8>, layer: &GooPreparedLayer, timing: &GooTimi
         )
     } else {
         (
-            timing.normal_exposure_sec,
+            if (layer.index as u32) < (timing.bottom_layer_count + timing.transition_layer_count as u32) {
+                interpolate_transition_layer_exposure(layer, &timing)
+            } else { timing.normal_exposure_sec }, //Layer exposure time
             timing.light_off_delay_sec,
             timing.wait_time_after_cure_sec,
             timing.wait_time_after_lift_sec,
