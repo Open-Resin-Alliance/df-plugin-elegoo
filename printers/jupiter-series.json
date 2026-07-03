@@ -58,5 +58,39 @@
       "mirrorX": true,
       "mirrorY": false
     }
+  },
+  {
+    "presetId": "elegoo-jupiter-2-goo",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Jupiter",
+    "name": "Jupiter 2",
+    "imageAssetPath": "./assets/jupiter/jupiter-2.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Jupiter",
+    "buildVolumeMm": {
+      "width": 302.4,
+      "depth": 161.98,
+      "height": 300
+    },
+    "pixelSize": {
+      "x": 20,
+      "y": 26
+    },
+    "bitDepth": {
+      "bits": 3,
+      "description": "3-bit color depth, suboptimal for grayscale"
+    },
+    "display": {
+      "resolutionX": 15120,
+      "resolutionY": 6230,
+      "outputFormat": ".goo",
+      "formatVersion": "v5.1",
+      "settingsMode": "twostage",
+      "mirrorX": true,
+      "mirrorY": false
+    }
   }
 ]
