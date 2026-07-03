@@ -150,7 +150,7 @@
   },
   {
     "presetId": "elegoo-saturn-4-ultra-ctb",
-    "profileVersion": 2,
+    "profileVersion": 3,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4 Ultra",
@@ -173,14 +173,14 @@
       "resolutionY": 5120,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
-      "settingsMode": "simple",
+      "settingsMode": "tilting",
       "mirrorX": true,
       "mirrorY": false
     }
   },
   {
     "presetId": "elegoo-saturn-4-ultra-16k-ctb",
-    "profileVersion": 3,
+    "profileVersion": 4,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4 Ultra 16K",
@@ -207,7 +207,7 @@
       "resolutionY": 6230,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
-      "settingsMode": "simple",
+      "settingsMode": "tilting",
       "mirrorX": true,
       "mirrorY": false
     }

@@ -9,6 +9,8 @@ import { GOO_FORMAT_DEFINITION } from './slicing/gooFormatDefinition';
 import gooSimpleMaterialSettings from './materialSettings/settings_simple.json';
 import gooTwostageMaterialSettings from './materialSettings/settings_twostage.json';
 import gooTwostageDiffMaterialSettings from './materialSettings/settings_twostage.diff.json';
+import gooTiltingDiffMaterialSettings from './materialSettings/settings_tilting.diff.json';
+import gooBetaSimpleMaterialSettings from './materialSettings/settings_betaonestep.diff.json';
 
 
 function createGooModeSettingsAdapter(
@@ -26,10 +28,14 @@ function createGooModeSettingsAdapter(
 const GOO_MODE_SOURCES: Record<string, MaterialSettingsSource> = {
     simple: gooSimpleMaterialSettings as MaterialSettingsSource,
     twostage: gooTwostageDiffMaterialSettings as MaterialSettingsSource,
+    betaonestep: gooBetaSimpleMaterialSettings as MaterialSettingsSource,
+    tilting: gooTiltingDiffMaterialSettings as MaterialSettingsSource,
 };
 
 const GOO_LOCAL_MATERIAL_SETTINGS_SIMPLE_ADAPTER = createGooModeSettingsAdapter('simple', GOO_MODE_SOURCES);
 const GOO_LOCAL_MATERIAL_SETTINGS_TWOSTAGE_ADAPTER = createGooModeSettingsAdapter('twostage', GOO_MODE_SOURCES);
+const GOO_LOCAL_MATERIAL_SETTINGS_BETAONESTEP_ADAPTER = createGooModeSettingsAdapter('betaonestep', GOO_MODE_SOURCES);
+const GOO_LOCAL_MATERIAL_SETTINGS_TILTING_ADAPTER = createGooModeSettingsAdapter('tilting', GOO_MODE_SOURCES);
 
 export const ELEGOO_COMPLEX_PLUGIN_DEFINITION: ComplexPluginDefinition = {
     id: 'elegoo',
@@ -50,6 +56,8 @@ export const ELEGOO_COMPLEX_PLUGIN_DEFINITION: ComplexPluginDefinition = {
         [GOO_FORMAT_DEFINITION.outputFormat]: {
             simple: GOO_LOCAL_MATERIAL_SETTINGS_SIMPLE_ADAPTER,
             twostage: GOO_LOCAL_MATERIAL_SETTINGS_TWOSTAGE_ADAPTER,
+            betaonestep: GOO_LOCAL_MATERIAL_SETTINGS_BETAONESTEP_ADAPTER,
+            tilting: GOO_LOCAL_MATERIAL_SETTINGS_TILTING_ADAPTER,
         },
     },
 };
