@@ -17,7 +17,7 @@ use super::goo_types::{
     GOO_HEADER_SIZE, GOO_LAYER_DEF_SIZE,
 };
 
-fn compute_print_time_seconds(total_layers: usize, timing: &GooTimingModel) -> u32 {
+pub(super) fn compute_print_time_seconds(total_layers: usize, timing: &GooTimingModel) -> u32 {
     let bottom_count = timing.bottom_layer_count as usize;
     let normal_count = total_layers.saturating_sub(bottom_count);
 

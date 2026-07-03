@@ -1,5 +1,7 @@
 [dependencies]
-# No additional crates needed; goo_preview reuses png and base64 already in the engine.
+# goo_preview reuses png and base64 already in the engine.
+# md-5 (RustCrypto) provides the GOO V5.1 footer checksum.
+md-5 = "0.10"
 
 [optional-dependencies]
 
@@ -7,5 +9,5 @@
 default = []
 
 [notes]
-purpose = "Goo big-endian format encoding with RGB565 previews and custom RLE"
+purpose = "Goo V1.2 (big-endian) and V5.1 (little-endian, MD5 footer) encoding"
 minimum-rust = "1.75"

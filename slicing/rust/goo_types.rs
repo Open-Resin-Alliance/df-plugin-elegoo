@@ -36,6 +36,66 @@ pub(super) const GOO_LAYER_COUNT_OFFSET: u64 = 195_310;
 /// LayerDefAddress(4) + GrayScaleLevel(1) + TransitionLayerCount(2).
 pub(super) const GOO_LAYER_DEF_ADDRESS_OFFSET: u64 = GOO_HEADER_SIZE as u64 - 7;
 
+// ── GOO V5.1 (Satellite / Jupiter 2) constants — little-endian container ──
+// Reference: /root/GOO_v5_Format_Spec.md. Header size is 195,492 (validated
+// against real files + live tracing); UVtools PR #1129's 195,496 is wrong.
+
+pub(super) const GOO_V5_MAGIC: &[u8; 4] = b"V5.1";
+/// Number of column-partition panels per layer at this architecture.
+pub(super) const GOO_V5_PARTITION_COUNT: usize = 2;
+/// End of the fixed header incl. previews (start of the printer parameters).
+pub(super) const GOO_V5_PARAMS_OFFSET: u32 = 195_310;
+/// Start of the 16-byte DRAM preamble (`offset of layer content` points here).
+pub(super) const GOO_V5_PREAMBLE_OFFSET: u32 = 195_477;
+/// Position of the LDT (T1) magic byte — the validated header size.
+pub(super) const GOO_V5_LDT_MARKER: u32 = 195_492;
+/// First byte of T1's entries (LDT marker + 1).
+pub(super) const GOO_V5_LDT_START: u32 = 195_493;
+/// Bytes per 66-byte little-endian layer definition (CRLF included).
+pub(super) const GOO_V5_LAYER_DEF_SIZE: usize = 66;
+/// Size of the RDT "pad" between T2 and the layer definitions.
+pub(super) const GOO_V5_RDT_PAD_SIZE: u32 = 14;
+/// Fixed pre-MD5 footer blob length (0x66 + profile + zero pad + f32 1.15 +
+/// u32 0 + CRLF), matching the reference files' RDT entry size (0x8E).
+pub(super) const GOO_V5_FOOTER_BLOB_SIZE: usize = 142;
+
+#[derive(Debug, Clone)]
+pub(super) struct GooV5PreparedLayer {
+    pub index: usize,
+    /// Framed RLE blocks (`0x55 … checksum CRLF`), left panel then right.
+    pub blocks: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GooV5RleMode {
+    /// Dense-grayscale/AA grammar (§7.7) — UVtools always encodes with this.
+    Vuf,
+    /// Binary grammar (§7.2) — kept selectable for hardware A/B testing.
+    Binary,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct GooV5Settings {
+    pub rle_mode: GooV5RleMode,
+    /// Preamble byte 14; `max_level = (1 << pixel_bit_width) - 1`.
+    pub pixel_bit_width: u8,
+    /// Identity strings the printer validates at load (spec §16).
+    pub slicer_name: String,
+    pub printer_name: String,
+    pub printer_type: String,
+    /// Must equal the footer profile blob or the printer rejects the file.
+    pub profile_name: String,
+}
+
+impl GooV5Settings {
+    pub fn max_level(&self) -> u8 {
+        match self.pixel_bit_width.clamp(1, 8) {
+            8 => 255,
+            bits => (1u16 << bits) as u8 - 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct GooPreparedLayer {
     pub index: usize,

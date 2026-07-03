@@ -226,10 +226,11 @@ pub(super) fn prepare_layers_for_goo_with_progress(
     out
 }
 
-// === Public Dispatcher ===
-// GOO V1.2 is the only variant today; a future variant (e.g. the
-// little-endian V5.x layout) would branch here, mirroring the CTB
-// v5/v5enc dispatch in ctb_layout.rs.
+// === Public Dispatcher (V1.2) ===
+// V5.1 uses a different prepared-layer shape (2 framed panels per layer), so
+// its dispatch happens at the encoder level in encoder_impl.rs
+// (parse_goo_format_version_hint_from_job) before layers are prepared;
+// V1.2 containers are assembled by goo_encoder.rs via this entry point.
 
 pub(super) fn build_goo_container_bytes(
     job: &SliceJobV3,
