@@ -1,0 +1,16 @@
+{
+    "$inherit": "betaonestep",
+    "$remove":
+    {
+        "fields": [
+            "bottomLiftDistanceMm",
+            "bottomLiftSpeedMmMin",
+            "bottomRetractSpeedMmMin",
+            "gapAfterBottomLiftDistance",
+            "gapAfterLiftDistance",
+            "liftDistanceMm",
+            "liftSpeedMmMin",
+            "retractSpeedMmMin"
+        ]   
+    }
+}

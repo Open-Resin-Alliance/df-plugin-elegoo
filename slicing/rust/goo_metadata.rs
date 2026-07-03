@@ -103,6 +103,13 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         .map(|s| s.eq_ignore_ascii_case("simple"))
         .unwrap_or(false);
 
+    let is_tilting_mode = meta
+        .get("printer")
+        .and_then(|o| o.get("settingsMode"))
+        .and_then(Value::as_str)
+        .map(|s| s.eq_ignore_ascii_case("tilting"))
+        .unwrap_or(false);
+
     let normal_exposure_sec =
         goo("normalExposureSec").or_else(|| mat("normalExposureSec")).unwrap_or(zero.normal_exposure_sec);
     let bottom_exposure_sec =
@@ -156,6 +163,12 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
                 goo("bottomWaitTimeAfterLiftSec").or_else(|| mat("bottomWaitTimeAfterLiftSec")).unwrap_or(0.0),
             )
         };
+
+    if is_tilting_mode {
+        timing.lift_speed_mm_min, timing.bottom_lift_speed_mm_min = 60.0;
+        timing.retract_speed_mm_min, timing.bottom_retract_speed_mm_min = 150.0;
+        timing.lift_distance_mm, timing.bottom_lift_distance_mm = read_f32("layerHeightMm");
+    }
 
     let transition_layer_count = goo_u32("transitionLayerCount")
         .or_else(|| mat_u32("transitionLayerCount"))
