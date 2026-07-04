@@ -174,14 +174,6 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         .get("export")
         .and_then(|v| v.get("goo"))
         .and_then(Value::as_object);
-    // The differential material settings contract shares field definitions
-    // with the goo plugin, so some GOO fields arrive under the `goo` object
-    // (see plugins/elegoo/materialSettings/*.json). Read those as fallbacks.
-    let goo = meta.get("goo").and_then(Value::as_object);
-    let export_goo = meta
-        .get("export")
-        .and_then(|v| v.get("goo"))
-        .and_then(Value::as_object);
 
     let settings_mode = goo
         .and_then(|m| m.get("settingsMode"))
@@ -218,8 +210,6 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         goo.and_then(|m| m.get(key))
             .and_then(Value::as_f64)
             .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
-            .or_else(|| goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
-            .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
             .or_else(|| material.and_then(|m| m.get(key)).and_then(Value::as_f64))
             .map(|v| v as f32)
     };
@@ -227,8 +217,6 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
     let read_u32 = |key: &str| {
         goo.and_then(|m| m.get(key))
             .and_then(Value::as_u64)
-            .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
-            .or_else(|| goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .or_else(|| material.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .unwrap_or(0) as u32

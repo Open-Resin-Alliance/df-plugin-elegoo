@@ -82,7 +82,10 @@ fn write_goo_v5_layer_def(
     let (
         exposure, light_off, w_after_cure, w_after_lift, w_before_cure,
         lift_h, lift_s, lift_h2, lift_s2,
-        ret_h, ret_s, ret_h2, ret_s2,
+        //ret_h, 
+        ret_s, 
+        //ret_h2, 
+        ret_s2,
         pwm,
     ) = if is_bottom {
         (
@@ -95,9 +98,9 @@ fn write_goo_v5_layer_def(
             timing.bottom_lift_speed_mm_min,
             timing.bottom_lift_distance2_mm,
             timing.bottom_lift_speed2_mm_min,
-            timing.bottom_retract_distance_mm,
+            //timing.bottom_retract_distance_mm,
             timing.bottom_retract_speed_mm_min,
-            timing.bottom_retract_distance2_mm,
+            // timing.bottom_retract_distance2_mm,
             timing.bottom_retract_speed2_mm_min,
             timing.bottom_light_pwm,
         )
@@ -112,9 +115,9 @@ fn write_goo_v5_layer_def(
             timing.lift_speed_mm_min,
             timing.lift_distance2_mm,
             timing.lift_speed2_mm_min,
-            timing.retract_distance_mm,
+            //timing.retract_distance_mm,
             timing.retract_speed_mm_min,
-            timing.retract_distance2_mm,
+            // timing.retract_distance2_mm,
             timing.retract_speed2_mm_min,
             timing.light_pwm,
         )
