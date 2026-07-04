@@ -65,7 +65,7 @@
     "manufacturer": "ELEGOO",
     "family": "Jupiter",
     "name": "Jupiter 2",
-    "imageAssetPath": "./assets/jupiter/jupiter-2.png",
+    "imageAssetPath": "./assets/jupiter/jupiter2.png",
     "antiAliasing": true,
     "hasCamera": false,
     "networkSupport": null,
