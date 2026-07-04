@@ -33,7 +33,7 @@
       "max": 120,
       "step": 0.01,
       "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "bottom-wait-times", "order": 20 },
-      "metadataPath": "ctb.bottomWaitTimeBeforeCureSec"
+      "metadataPath": "goo.bottomWaitTimeBeforeCureSec"
     },
     {
       "key": "bottomWaitTimeAfterCureSec",
@@ -44,7 +44,7 @@
       "max": 120,
       "step": 0.01,
       "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "bottom-wait-times", "order": 30 },
-      "metadataPath": "ctb.bottomWaitTimeAfterCureSec"
+      "metadataPath": "goo.bottomWaitTimeAfterCureSec"
     },
     {
       "key": "bottomWaitTimeAfterLiftSec",
@@ -55,7 +55,7 @@
       "max": 120,
       "step": 0.01,
       "placement": { "tabId": "simple", "sectionId": "burn-in", "cardId": "bottom-wait-times", "order": 40 },
-      "metadataPath": "ctb.bottomWaitTimeAfterLiftSec"
+      "metadataPath": "goo.bottomWaitTimeAfterLiftSec"
     },
     {
       "key": "transitionLayerCount",
@@ -70,7 +70,7 @@
       "max": 100,
       "step": 1,
       "placement": { "tabId": "simple", "sectionId": "light", "cardId": "light-settings", "order": 75 },
-      "metadataPath": "ctb.bottomLayerProjectorPwmPercent"
+      "metadataPath": "goo.bottomLayerProjectorPwmPercent"
     },
     {
       "key": "bottomLiftDistanceMm",
@@ -79,7 +79,7 @@
       "color": "#f59e0b",
       "splitWithKey": "bottomLiftDistance2Mm",
       "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 5 },
-      "metadataPath": "ctb.bottomLiftDistanceMm"
+      "metadataPath": "goo.bottomLiftDistanceMm"
     },
     {
       "key": "bottomLiftDistance2Mm",
@@ -92,7 +92,7 @@
       "max": 50,
       "step": 0.01,
       "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 5 },
-      "metadataPath": "ctb.bottomLiftDistance2Mm"
+      "metadataPath": "goo.bottomLiftDistance2Mm"
     },
     {
       "key": "bottomLiftSpeedMmMin",
@@ -101,7 +101,7 @@
       "color": "#f59e0b",
       "splitWithKey": "bottomLiftSpeed2MmMin",
       "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 6 },
-      "metadataPath": "ctb.bottomLiftSpeedMmMin"
+      "metadataPath": "goo.bottomLiftSpeedMmMin"
     },
     {
       "key": "bottomLiftSpeed2MmMin",
@@ -114,7 +114,7 @@
       "max": 100000,
       "step": 1,
       "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 6 },
-      "metadataPath": "ctb.bottomLiftSpeed2MmMin"
+      "metadataPath": "goo.bottomLiftSpeed2MmMin"
     },
     {
       "key": "bottomRetractSpeedMmMin",
@@ -123,7 +123,7 @@
       "color": "#22c55e",
       "splitWithKey": "bottomRetractSpeed2MmMin",
       "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 7 },
-      "metadataPath": "ctb.bottomRetractSpeedMmMin"
+      "metadataPath": "goo.bottomRetractSpeedMmMin"
     },
     {
       "key": "bottomRetractSpeed2MmMin",
@@ -136,7 +136,7 @@
       "max": 100000,
       "step": 1,
       "placement": { "tabId": "twostage", "sectionId": "twostage-burn-in-motion", "cardId": "twostage-burn-in-settings", "order": 7 },
-      "metadataPath": "ctb.bottomRetractSpeed2MmMin"
+      "metadataPath": "goo.bottomRetractSpeed2MmMin"
     },
     {
       "key": "liftDistanceMm",
@@ -157,7 +157,7 @@
       "max": 50,
       "step": 0.01,
       "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 11 },
-      "metadataPath": "ctb.liftDistance2Mm"
+      "metadataPath": "goo.liftDistance2Mm"
     },
     {
       "key": "liftSpeedMmMin",
@@ -177,7 +177,7 @@
       "max": 100000,
       "step": 1,
       "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 21 },
-      "metadataPath": "ctb.liftSpeed2MmMin"
+      "metadataPath": "goo.liftSpeed2MmMin"
     },
     {
       "key": "retractSpeedMmMin",
@@ -198,7 +198,7 @@
       "max": 100000,
       "step": 1,
       "placement": { "tabId": "twostage", "sectionId": "twostage-motion", "cardId": "twostage-settings", "order": 41 },
-      "metadataPath": "ctb.retractSpeed2MmMin"
+      "metadataPath": "goo.retractSpeed2MmMin"
     }
   ]
 }
