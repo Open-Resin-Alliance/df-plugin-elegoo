@@ -175,12 +175,12 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         .and_then(|v| v.get("goo"))
         .and_then(Value::as_object);
     // The differential material settings contract shares field definitions
-    // with the CTB plugin, so some GOO fields arrive under the `ctb` object
+    // with the goo plugin, so some GOO fields arrive under the `goo` object
     // (see plugins/elegoo/materialSettings/*.json). Read those as fallbacks.
-    let ctb = meta.get("ctb").and_then(Value::as_object);
-    let export_ctb = meta
+    let goo = meta.get("goo").and_then(Value::as_object);
+    let export_goo = meta
         .get("export")
-        .and_then(|v| v.get("ctb"))
+        .and_then(|v| v.get("goo"))
         .and_then(Value::as_object);
 
     let settings_mode = goo
@@ -218,8 +218,8 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         goo.and_then(|m| m.get(key))
             .and_then(Value::as_f64)
             .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
-            .or_else(|| ctb.and_then(|m| m.get(key)).and_then(Value::as_f64))
-            .or_else(|| export_ctb.and_then(|m| m.get(key)).and_then(Value::as_f64))
+            .or_else(|| goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
+            .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
             .or_else(|| material.and_then(|m| m.get(key)).and_then(Value::as_f64))
             .map(|v| v as f32)
     };
@@ -228,8 +228,8 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         goo.and_then(|m| m.get(key))
             .and_then(Value::as_u64)
             .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
-            .or_else(|| ctb.and_then(|m| m.get(key)).and_then(Value::as_u64))
-            .or_else(|| export_ctb.and_then(|m| m.get(key)).and_then(Value::as_u64))
+            .or_else(|| goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
+            .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .or_else(|| material.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .unwrap_or(0) as u32
     };

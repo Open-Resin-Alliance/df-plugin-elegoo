@@ -120,6 +120,8 @@ fn write_goo_v5_layer_def(
         )
     };
 
+    let ret_height = lift_h + lift_h2 - layer_height_mm; // V5.1 spec §6.1: retract distance 2 = lift distance 1 + lift distance 2 − layer height
+
     let def_start = out.len();
 
     push_u16_le(out, 0);                                        // Pause flag
@@ -134,9 +136,9 @@ fn write_goo_v5_layer_def(
     push_f32_le(out, lift_s);                                   // Lift speed
     push_f32_le(out, lift_h2);                                  // Lift distance 2
     push_f32_le(out, lift_s2);                                  // Lift speed 2
-    push_f32_le(out, ret_h);                                    // Retract distance
+    push_f32_le(out, 0.0);                                    // Retract distance
     push_f32_le(out, ret_s);                                    // Retract speed
-    push_f32_le(out, ret_h2);                                   // Retract distance 2
+    push_f32_le(out, ret_height);                                   // Retract distance 2
     push_f32_le(out, ret_s2);                                   // Retract speed 2
     push_u16_le(out, pwm);                                      // Light PWM
     push_crlf(out);                                             // Delimiter
