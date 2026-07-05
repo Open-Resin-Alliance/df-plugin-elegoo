@@ -11,6 +11,7 @@ export const GOO_FORMAT_DEFINITION: SlicingFormatDefinition = {
   settingsModes: [
     { value: 'simple', label: 'Simple', isDefault: true },
     { value: 'twostage', label: 'Two Stage' },
+    { value: 'tilting', label: 'Tilting Vat' }
   ],
   rustModulePath: 'formats::goo',
   wasmExportName: 'encode_goo_container',
