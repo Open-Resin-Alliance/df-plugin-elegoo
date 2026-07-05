@@ -3,11 +3,97 @@ use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::goo_types::{
-    GooBuildModel, GooTimingModel, DEFAULT_BINARY_THRESHOLD, DEFAULT_MACHINE_NAME,
-    DEFAULT_MACHINE_TYPE, DEFAULT_PROFILE_NAME,
+    GooBuildModel, GooTimingModel, GooV5RleMode, GooV5Settings, DEFAULT_BINARY_THRESHOLD,
+    DEFAULT_MACHINE_NAME, DEFAULT_MACHINE_TYPE, DEFAULT_PROFILE_NAME,
 };
 
 const DEFAULT_MACHINE_Z_MM: f32 = 220.0;
+
+// Identity strings the Jupiter 2 printer validates at load (spec §16);
+// anything else fails file verification on the printer.
+const GOO_V5_DEFAULT_SLICER_NAME: &str = "ELEGOO SatelLite";
+const GOO_V5_DEFAULT_PRINTER_NAME: &str = "ELEGOO Jupiter 2";
+const GOO_V5_DEFAULT_PROFILE_NAME: &str = "Normal";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GooFormatVersion {
+    V12,
+    V51,
+}
+
+pub(super) fn parse_goo_format_version_hint(value: Option<&str>) -> Option<GooFormatVersion> {
+    let raw = value?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+
+    let normalized: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect();
+
+    match normalized.as_str() {
+        "12" | "v12" | "goov12" => Some(GooFormatVersion::V12),
+        "5" | "v5" | "51" | "v51" | "goov5" | "goov51" => Some(GooFormatVersion::V51),
+        _ => None,
+    }
+}
+
+pub(super) fn parse_goo_format_version_hint_from_job(job: &SliceJobV3) -> Option<GooFormatVersion> {
+    parse_goo_format_version_hint(job.format_version.as_deref())
+}
+
+pub(super) fn parse_goo_v5_settings_from_metadata(metadata_json: &str) -> GooV5Settings {
+    let meta = parse_json(metadata_json);
+    let goo_str = |field: &str| -> Option<String> {
+        meta.as_ref()
+            .and_then(|m| str_field(m, "goo", field))
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+
+    let rle_mode = goo_str("v5RleMode")
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+        .map(|s| match s {
+            "binary" => GooV5RleMode::Binary,
+            _ => GooV5RleMode::Vuf,
+        })
+        .unwrap_or(GooV5RleMode::Vuf);
+
+    let pixel_bit_width = meta
+        .as_ref()
+        .and_then(|m| m.get("goo"))
+        .and_then(|o| o.get("v5PixelBitWidth"))
+        .and_then(Value::as_u64)
+        .map(|v| v.clamp(1, 8) as u8)
+        .unwrap_or(match rle_mode {
+            // UVtools/the transcoder declare max_level=255 for VUF-encoded
+            // content; real binary-path captures carry the templated 3.
+            GooV5RleMode::Vuf => 8,
+            GooV5RleMode::Binary => 3,
+        });
+
+    let profile_name = goo_str("profileName")
+        .unwrap_or_else(|| GOO_V5_DEFAULT_PROFILE_NAME.to_string());
+
+    GooV5Settings {
+        rle_mode,
+        pixel_bit_width,
+        slicer_name: goo_str("slicerName")
+            .unwrap_or_else(|| GOO_V5_DEFAULT_SLICER_NAME.to_string()),
+        printer_name: goo_str("printerName")
+            .unwrap_or_else(|| GOO_V5_DEFAULT_PRINTER_NAME.to_string()),
+        printer_type: goo_str("printerType")
+            .unwrap_or_else(|| GOO_V5_DEFAULT_PRINTER_NAME.to_string()),
+        profile_name,
+    }
+}
+
+pub(super) fn parse_goo_v5_settings_from_job(job: &SliceJobV3) -> GooV5Settings {
+    parse_goo_v5_settings_from_metadata(&job.metadata_json)
+}
 
 fn parse_json(metadata_json: &str) -> Option<Value> {
     serde_json::from_str::<Value>(metadata_json).ok()
@@ -88,14 +174,6 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         .get("export")
         .and_then(|v| v.get("goo"))
         .and_then(Value::as_object);
-    // The differential material settings contract shares field definitions
-    // with the CTB plugin, so some GOO fields arrive under the `ctb` object
-    // (see plugins/elegoo/materialSettings/*.json). Read those as fallbacks.
-    let ctb = meta.get("ctb").and_then(Value::as_object);
-    let export_ctb = meta
-        .get("export")
-        .and_then(|v| v.get("ctb"))
-        .and_then(Value::as_object);
 
     let settings_mode = goo
         .and_then(|m| m.get("settingsMode"))
@@ -132,8 +210,6 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         goo.and_then(|m| m.get(key))
             .and_then(Value::as_f64)
             .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_f64))
-            .or_else(|| ctb.and_then(|m| m.get(key)).and_then(Value::as_f64))
-            .or_else(|| export_ctb.and_then(|m| m.get(key)).and_then(Value::as_f64))
             .or_else(|| material.and_then(|m| m.get(key)).and_then(Value::as_f64))
             .map(|v| v as f32)
     };
@@ -142,8 +218,6 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         goo.and_then(|m| m.get(key))
             .and_then(Value::as_u64)
             .or_else(|| export_goo.and_then(|m| m.get(key)).and_then(Value::as_u64))
-            .or_else(|| ctb.and_then(|m| m.get(key)).and_then(Value::as_u64))
-            .or_else(|| export_ctb.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .or_else(|| material.and_then(|m| m.get(key)).and_then(Value::as_u64))
             .unwrap_or(0) as u32
     };

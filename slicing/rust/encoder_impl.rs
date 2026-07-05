@@ -3,6 +3,8 @@ mod goo_metadata;
 mod goo_preview;
 mod goo_types;
 mod goo_encoder;
+mod goo_v5;
+mod goo_v5_rle;
 
 use crate::encoders::FormatEncoder;
 use crate::encoders::RawMaskStreamEncoder;
@@ -15,7 +17,12 @@ use goo_layout::{
     encode_goo_rle_from_runs, encode_single_goo_empty_layer,
     encode_single_goo_layer_from_raw_mask, prepare_layers_for_goo_with_progress,
 };
-use goo_metadata::{parse_threshold_from_job, parse_timing_model_from_job};
+use goo_metadata::{
+    parse_goo_format_version_hint_from_job, parse_goo_v5_settings_from_job,
+    parse_threshold_from_job, parse_timing_model_from_job, GooFormatVersion,
+};
+use goo_v5::{build_goo_v5_container_bytes, build_goo_v5_container_bytes_with_progress};
+use goo_v5_rle::{encode_panel_from_mask_window, encode_panel_from_runs};
 use std::path::Path;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -259,6 +266,212 @@ impl RleStreamEncoder for GooRleStreamingEncoder {
     }
 }
 
+// ── GOO V5.1 block-partitioned streaming encoder ─────────────────────────────
+
+/// Streaming encoder for the V5.1 container: declares the two half-screen
+/// column blocks via `rle_blocks`, encodes each panel with the configured
+/// grammar (VUF default, binary selectable via `goo.v5RleMode`), and
+/// assembles the little-endian container in `finalize_to_bytes`.
+struct GooV5RleStreamingEncoder {
+    job: SliceJobV3,
+    settings: goo_types::GooV5Settings,
+    threshold: u8,
+    is_anti_aliased: bool,
+    blocks: Vec<crate::rle::RleBlockSpec>,
+    full_width: usize,
+    height: usize,
+    /// encoded[layer][block] — framed panel blocks, left then right.
+    encoded: Vec<Vec<Option<Vec<u8>>>>,
+}
+
+impl GooV5RleStreamingEncoder {
+    fn new(job: &SliceJobV3) -> Self {
+        let full_width = job.source_width_px;
+        let half = full_width / 2;
+        Self {
+            job: job.clone(),
+            settings: parse_goo_v5_settings_from_job(job),
+            threshold: parse_threshold_from_job(job),
+            is_anti_aliased: job.produces_grayscale_output(),
+            blocks: vec![
+                crate::rle::make_rle_block(0, half),
+                crate::rle::make_rle_block(half, full_width - half),
+            ],
+            full_width: full_width as usize,
+            height: job.source_height_px as usize,
+            encoded: Vec::new(),
+        }
+    }
+
+    fn store(&mut self, layer: usize, block: usize, bytes: Vec<u8>) {
+        if self.encoded.len() <= layer {
+            self.encoded
+                .resize_with(layer + 1, || vec![None; goo_types::GOO_V5_PARTITION_COUNT]);
+        }
+        self.encoded[layer][block] = Some(bytes);
+    }
+
+    fn block_pixels(&self, block: usize) -> usize {
+        self.blocks
+            .get(block)
+            .map(|spec| spec.width as usize)
+            .unwrap_or(0)
+            * self.height
+    }
+}
+
+impl RleStreamEncoder for GooV5RleStreamingEncoder {
+    fn consume_rle_layer(
+        &mut self,
+        layer_index: u32,
+        runs: Vec<crate::rle::RleRun>,
+    ) -> Result<(), SlicerV3Error> {
+        // Whole-layer fallback (e.g. the 3DAA pipeline delivers full-width
+        // streams): split at the seam and encode both panels.
+        let specs = self.blocks.clone();
+        for (block_index, spec) in specs.iter().enumerate() {
+            let crop_right = (self.full_width as u32)
+                .saturating_sub(spec.start_col)
+                .saturating_sub(spec.width);
+            let window =
+                crate::rle::crop_rle_columns(&runs, self.full_width as u32, spec.start_col, crop_right);
+            let bytes = encode_panel_from_runs(
+                &window,
+                &self.settings,
+                self.threshold,
+                self.is_anti_aliased,
+                self.block_pixels(block_index),
+            );
+            self.store(layer_index as usize, block_index, bytes);
+        }
+        Ok(())
+    }
+
+    fn finalize_to_bytes(self: Box<Self>) -> Result<Vec<u8>, SlicerV3Error> {
+        if self.encoded.is_empty() {
+            return Err(SlicerV3Error::MissingRenderedLayerPayload(
+                "no rendered layers were provided for Goo V5 encoding".to_string(),
+            ));
+        }
+        let job = self.job;
+        let mut prepared = Vec::with_capacity(self.encoded.len());
+        for (index, blocks) in self.encoded.into_iter().enumerate() {
+            let mut layer_blocks = Vec::with_capacity(blocks.len());
+            for (block_index, block) in blocks.into_iter().enumerate() {
+                let Some(block) = block else {
+                    return Err(SlicerV3Error::MissingRenderedLayerPayload(format!(
+                        "Goo V5 layer {index} block {block_index} missing from streaming output"
+                    )));
+                };
+                layer_blocks.push(block);
+            }
+            prepared.push(goo_types::GooV5PreparedLayer {
+                index,
+                blocks: layer_blocks,
+            });
+        }
+        build_goo_v5_container_bytes(&job, &prepared)
+    }
+
+    fn rle_blocks(&self, _job: &SliceJobV3) -> Option<Vec<crate::rle::RleBlockSpec>> {
+        Some(self.blocks.clone())
+    }
+
+    fn consume_rle_block(
+        &mut self,
+        layer_index: u32,
+        block_index: u32,
+        runs: Vec<crate::rle::RleRun>,
+    ) -> Result<(), SlicerV3Error> {
+        let bytes = encode_panel_from_runs(
+            &runs,
+            &self.settings,
+            self.threshold,
+            self.is_anti_aliased,
+            self.block_pixels(block_index as usize),
+        );
+        self.store(layer_index as usize, block_index as usize, bytes);
+        Ok(())
+    }
+
+    fn parallel_encode_block_fn(
+        &self,
+    ) -> Option<
+        Arc<dyn Fn(u32, u32, &[crate::rle::RleRun]) -> Result<Vec<u8>, SlicerV3Error> + Send + Sync>,
+    > {
+        let settings = self.settings.clone();
+        let threshold = self.threshold;
+        let is_anti_aliased = self.is_anti_aliased;
+        let height = self.height;
+        let widths: Vec<usize> = self.blocks.iter().map(|b| b.width as usize).collect();
+
+        Some(Arc::new(
+            move |_layer_index: u32, block_index: u32, runs: &[crate::rle::RleRun]| {
+                let pixels = widths.get(block_index as usize).copied().unwrap_or(0) * height;
+                Ok(encode_panel_from_runs(
+                    runs,
+                    &settings,
+                    threshold,
+                    is_anti_aliased,
+                    pixels,
+                ))
+            },
+        ))
+    }
+
+    fn store_encoded_block(&mut self, layer_index: u32, block_index: u32, bytes: Vec<u8>) {
+        self.store(layer_index as usize, block_index as usize, bytes);
+    }
+}
+
+/// Raw-mask batch fallback for V5.1: split each full-width mask at the seam
+/// and encode both panels per layer.
+fn encode_goo_v5_container_from_raw_masks(
+    job: &SliceJobV3,
+    raw_masks: &[Vec<u8>],
+    on_progress: Option<&dyn Fn(u32, u32)>,
+) -> Result<Vec<u8>, SlicerV3Error> {
+    let settings = parse_goo_v5_settings_from_job(job);
+    let threshold = parse_threshold_from_job(job);
+    let is_anti_aliased = job.produces_grayscale_output();
+    let full_width = job.source_width_px as usize;
+    let height = job.source_height_px as usize;
+    let half = full_width / 2;
+    let windows = [(0usize, half), (half, full_width - half)];
+
+    let total_prepare = raw_masks.len() as u32;
+    let total_progress = total_prepare.saturating_add(1).max(1);
+
+    let mut prepared = Vec::with_capacity(raw_masks.len());
+    for (index, mask) in raw_masks.iter().enumerate() {
+        let blocks = windows
+            .iter()
+            .map(|&(start_col, window_width)| {
+                encode_panel_from_mask_window(
+                    mask,
+                    full_width,
+                    height,
+                    start_col,
+                    window_width,
+                    &settings,
+                    threshold,
+                    is_anti_aliased,
+                )
+            })
+            .collect();
+        prepared.push(goo_types::GooV5PreparedLayer { index, blocks });
+        if let Some(progress) = on_progress {
+            progress(index as u32 + 1, total_progress);
+        }
+    }
+
+    let bytes = build_goo_v5_container_bytes_with_progress(job, &prepared, None)?;
+    if let Some(progress) = on_progress {
+        progress(total_progress, total_progress);
+    }
+    Ok(bytes)
+}
+
 pub fn create_plugin_encoder() -> Vec<Box<dyn FormatEncoder>> {
     vec![Box::new(GooPluginEncoder)]
 }
@@ -282,6 +495,12 @@ impl FormatEncoder for GooPluginEncoder {
         &self,
         job: &SliceJobV3,
     ) -> Result<Option<Box<dyn RawMaskStreamEncoder>>, SlicerV3Error> {
+        // V5.1 jobs stream through the block-partitioned RLE encoder; batch
+        // raw-mask callers fall back to `encode_container_from_rendered_layers`.
+        if parse_goo_format_version_hint_from_job(job) == Some(GooFormatVersion::V51) {
+            return Ok(None);
+        }
+
         let timing = parse_timing_model_from_job(job);
         let threshold = parse_threshold_from_job(job);
         let expected_pixels =
@@ -369,6 +588,10 @@ impl FormatEncoder for GooPluginEncoder {
         &self,
         job: &SliceJobV3,
     ) -> Result<Option<Box<dyn RleStreamEncoder>>, SlicerV3Error> {
+        if parse_goo_format_version_hint_from_job(job) == Some(GooFormatVersion::V51) {
+            return Ok(Some(Box::new(GooV5RleStreamingEncoder::new(job))));
+        }
+
         let timing = parse_timing_model_from_job(job);
         let threshold = parse_threshold_from_job(job);
         let is_anti_aliased = job.produces_grayscale_output();
@@ -422,6 +645,10 @@ impl FormatEncoder for GooPluginEncoder {
                     layer.len()
                 )));
             }
+        }
+
+        if parse_goo_format_version_hint_from_job(job) == Some(GooFormatVersion::V51) {
+            return encode_goo_v5_container_from_raw_masks(job, raw_masks, on_progress);
         }
 
         let timing = parse_timing_model_from_job(job);
@@ -961,5 +1188,265 @@ mod tests {
         let last = encoded.len() - 1;
         encoded[last] ^= 0xFF;
         assert!(decode_goo_rle(&encoded, 16).is_err());
+    }
+
+    // ── GOO V5.1 ──────────────────────────────────────────────────────────
+
+    use super::goo_metadata::{parse_goo_format_version_hint, GooFormatVersion};
+    use super::goo_types::{
+        GooV5PreparedLayer, GOO_V5_FOOTER_BLOB_SIZE, GOO_V5_LDT_MARKER, GOO_V5_LDT_START,
+        GOO_V5_MAGIC, GOO_V5_PARAMS_OFFSET, GOO_V5_PREAMBLE_OFFSET,
+    };
+    use super::goo_v5::{build_goo_v5_container_bytes, write_goo_v5_t2};
+    use super::goo_v5_rle::{decode_panel_binary, decode_panel_vuf, encode_panel_from_mask_window};
+
+    fn u32_le(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+    }
+
+    fn f32_le(bytes: &[u8], offset: usize) -> f32 {
+        f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+    }
+
+    fn make_v5_test_job() -> SliceJobV3 {
+        let mut job = make_test_job();
+        job.format_version = Some("v5.1".to_string());
+        job.metadata_json = r#"{
+            "material": {
+                "normalExposureSec": 2.0,
+                "bottomExposureSec": 20.0,
+                "bottomLayerCount": 1
+            }
+        }"#
+        .to_string();
+        job
+    }
+
+    fn make_v5_prepared(job: &SliceJobV3, masks: &[Vec<u8>]) -> Vec<GooV5PreparedLayer> {
+        let settings = super::goo_metadata::parse_goo_v5_settings_from_job(job);
+        let full_width = job.source_width_px as usize;
+        let height = job.source_height_px as usize;
+        let half = full_width / 2;
+        masks
+            .iter()
+            .enumerate()
+            .map(|(index, mask)| GooV5PreparedLayer {
+                index,
+                blocks: [(0usize, half), (half, full_width - half)]
+                    .iter()
+                    .map(|&(start, w)| {
+                        encode_panel_from_mask_window(
+                            mask, full_width, height, start, w, &settings, 127, false,
+                        )
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn goo_v5_hint_parses_supported_tokens() {
+        assert_eq!(
+            parse_goo_format_version_hint(Some("v5.1")),
+            Some(GooFormatVersion::V51)
+        );
+        assert_eq!(
+            parse_goo_format_version_hint(Some("V5")),
+            Some(GooFormatVersion::V51)
+        );
+        assert_eq!(
+            parse_goo_format_version_hint(Some("goo-v5.1")),
+            Some(GooFormatVersion::V51)
+        );
+        assert_eq!(
+            parse_goo_format_version_hint(Some("v1.2")),
+            Some(GooFormatVersion::V12)
+        );
+        assert_eq!(parse_goo_format_version_hint(None), None);
+        assert_eq!(parse_goo_format_version_hint(Some("unknown")), None);
+    }
+
+    #[test]
+    fn goo_v5_container_layout_tables_and_md5() {
+        let job = make_v5_test_job();
+        // Layer 0: solid white. Layer 1: white band crossing the seam.
+        let mask0 = vec![255u8; 16];
+        let mut mask1 = vec![0u8; 16];
+        for row in 0..4 {
+            mask1[row * 4 + 1] = 255;
+            mask1[row * 4 + 2] = 255;
+        }
+        let prepared = make_v5_prepared(&job, &[mask0.clone(), mask1.clone()]);
+        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+
+        // Optional dump for external reference-decoder validation.
+        if let Ok(path) = std::env::var("GOO_V5_TEST_DUMP") {
+            let _ = std::fs::write(path, &bytes);
+        }
+
+        // Header + identity strings (§16 — printer-validated).
+        assert_eq!(&bytes[0..4], GOO_V5_MAGIC);
+        assert_eq!(u32_le(&bytes, 4), 7);
+        assert_eq!(&bytes[8..12], b"DLP\0");
+        assert_eq!(&bytes[12..28], b"ELEGOO SatelLite");
+        assert_eq!(&bytes[92..108], b"ELEGOO Jupiter 2");
+        assert_eq!(&bytes[124..140], b"ELEGOO Jupiter 2");
+        assert_eq!(&bytes[156..163], b"Normal\0");
+
+        // Printer parameters.
+        let params = GOO_V5_PARAMS_OFFSET as usize;
+        assert_eq!(u32_le(&bytes, params), 2); // layer count
+        assert_eq!(
+            u16::from_le_bytes(bytes[params + 4..params + 6].try_into().unwrap()),
+            4
+        ); // resolution X
+        assert_eq!(u32_le(&bytes, 195_470), GOO_V5_PREAMBLE_OFFSET); // offset of layer content
+
+        // Preamble (§4.1).
+        let pre = GOO_V5_PREAMBLE_OFFSET as usize;
+        let ldt_start = GOO_V5_LDT_START as usize;
+        let l = 2usize;
+        let iedt = ldt_start + l * 8;
+        let rdt_marker = ldt_start + l * 24 + 1;
+        let defs_base = ldt_start + l * 24 + 14;
+        assert_eq!(bytes[pre], 2); // PartitionCount
+        assert_eq!(u32_le(&bytes, pre + 1), GOO_V5_LDT_MARKER);
+        assert_eq!(u32_le(&bytes, pre + 5), iedt as u32);
+        assert_eq!(u32_le(&bytes, pre + 9), rdt_marker as u32);
+        assert_eq!(bytes[pre + 14], 8); // PixelBitWidth (VUF default)
+        assert_eq!(bytes[pre + 15], 0xA1); // LDT magic
+
+        // T1: [offset_to_def][66] per layer.
+        assert_eq!(u32_le(&bytes, ldt_start), defs_base as u32);
+        assert_eq!(u32_le(&bytes, ldt_start + 4), 66);
+        assert_eq!(u32_le(&bytes, ldt_start + 8), (defs_base + 66) as u32);
+
+        // T2: addr0 formula, page_size = block_bytes × 256, −162 after block 0.
+        let block_sizes: Vec<usize> = prepared
+            .iter()
+            .flat_map(|p| p.blocks.iter().map(|b| b.len()))
+            .collect();
+        let addr0: u64 = 0x3A2 + 50_049_024 + 23_040 * 2;
+        assert_eq!(u32_le(&bytes, iedt), addr0 as u32);
+        assert_eq!(u32_le(&bytes, iedt + 4), (block_sizes[0] * 256) as u32);
+        let addr1 = addr0 + (block_sizes[0] as u64) * 256 - 162;
+        assert_eq!(u32_le(&bytes, iedt + 8), (addr1 & 0xFFFF_FFFF) as u32);
+
+        // RDT pad: 00 A3 count=1 [end_of_rle][blob size].
+        let pad = ldt_start + l * 24;
+        let total_rle: usize = block_sizes.iter().sum();
+        let end_of_rle = defs_base + l * 66 + total_rle;
+        assert_eq!(bytes[pad], 0);
+        assert_eq!(bytes[pad + 1], 0xA3);
+        assert_eq!(u32_le(&bytes, pad + 2), 1);
+        assert_eq!(u32_le(&bytes, pad + 6), end_of_rle as u32);
+        assert_eq!(u32_le(&bytes, pad + 10), GOO_V5_FOOTER_BLOB_SIZE as u32);
+
+        // Layer defs: bottom layer uses bottom exposure, CRLF-terminated.
+        assert!((f32_le(&bytes, defs_base + 6) - 0.05).abs() < 1e-6); // position Z
+        assert!((f32_le(&bytes, defs_base + 10) - 20.0).abs() < f32::EPSILON);
+        assert_eq!(&bytes[defs_base + 64..defs_base + 66], &[0x0D, 0x0A]);
+        assert!((f32_le(&bytes, defs_base + 66 + 10) - 2.0).abs() < f32::EPSILON);
+
+        // Decode every panel via the T2 sizes and reassemble the layers.
+        let rle_start = defs_base + l * 66;
+        let mut pos = rle_start;
+        let mut panels = Vec::new();
+        for size in &block_sizes {
+            panels.push(decode_panel_vuf(&bytes[pos..pos + size], 8, 255).expect("panel"));
+            pos += size;
+        }
+        assert_eq!(pos, end_of_rle);
+        for (layer, mask) in [(0usize, &mask0), (1usize, &mask1)] {
+            let (left, right) = (&panels[layer * 2], &panels[layer * 2 + 1]);
+            let mut stacked = Vec::with_capacity(16);
+            for row in 0..4 {
+                stacked.extend_from_slice(&left[row * 2..row * 2 + 2]);
+                stacked.extend_from_slice(&right[row * 2..row * 2 + 2]);
+            }
+            let expected: Vec<u8> = mask
+                .iter()
+                .map(|&p| if p > 127 { 255 } else { 0 })
+                .collect();
+            assert_eq!(stacked, expected, "layer {layer} reassembly");
+        }
+
+        // Footer: profile blob + trailing lowercase MD5 over everything else.
+        let blob_start = bytes.len() - 32 - GOO_V5_FOOTER_BLOB_SIZE;
+        assert_eq!(blob_start, end_of_rle);
+        assert_eq!(bytes[blob_start], 0x66);
+        assert_eq!(&bytes[blob_start + 1..blob_start + 8], b"Normal\0");
+        assert!((f32_le(&bytes, bytes.len() - 42) - 1.15).abs() < f32::EPSILON);
+        assert_eq!(u32_le(&bytes, bytes.len() - 38), 0);
+        assert_eq!(&bytes[bytes.len() - 34..bytes.len() - 32], &[0x0D, 0x0A]);
+
+        use md5::{Digest, Md5};
+        let digest = Md5::digest(&bytes[..bytes.len() - 32]);
+        let mut hex = String::new();
+        for byte in digest {
+            use std::fmt::Write;
+            let _ = write!(hex, "{:02x}", byte);
+        }
+        assert_eq!(&bytes[bytes.len() - 32..], hex.as_bytes());
+    }
+
+    #[test]
+    fn goo_v5_binary_mode_selectable_via_metadata() {
+        let mut job = make_v5_test_job();
+        job.metadata_json = r#"{ "goo": { "v5RleMode": "binary" } }"#.to_string();
+
+        let mut mask = vec![0u8; 16];
+        mask[5] = 255;
+        mask[6] = 255;
+        let prepared = make_v5_prepared(&job, &[mask]);
+        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+
+        // PixelBitWidth defaults to 3 on the binary path.
+        assert_eq!(bytes[GOO_V5_PREAMBLE_OFFSET as usize + 14], 3);
+
+        // The panels decode with the binary grammar.
+        let l = 1usize;
+        let defs_base = GOO_V5_LDT_START as usize + l * 24 + 14;
+        let iedt = GOO_V5_LDT_START as usize + l * 8;
+        let size0 = (u32_le(&bytes, iedt + 4) / 256) as usize;
+        let rle_start = defs_base + l * 66;
+        // mask[5] = row 1, col 1 → left-panel index row 1 × 2 + 1 = 3.
+        let left = decode_panel_binary(&bytes[rle_start..rle_start + size0], 8).expect("panel");
+        assert_eq!(left, vec![0, 0, 0, 255, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn goo_v5_t2_wrap_carries_into_page_size() {
+        // Cumulative addresses crossing 2³² must keep clean low-32 addresses
+        // while the wrap count rides in page_size (spec §5.1).
+        let layer_count = 4u32;
+        let sizes = vec![10_000_000usize; 8];
+        let mut t2 = Vec::new();
+        write_goo_v5_t2(&mut t2, &sizes, layer_count);
+        assert_eq!(t2.len(), 8 * 8);
+
+        let addr0: u128 = 0x3A2 + 50_049_024 + 23_040 * (layer_count as u128);
+        let mut full: u128 = addr0;
+        let mut saw_wrap = false;
+        for (i, &size) in sizes.iter().enumerate() {
+            let base = (size as u128) * 256;
+            let addr = u32_le(&t2, i * 8);
+            let page_size = u32_le(&t2, i * 8 + 4);
+            assert_eq!(addr, (full & 0xFFFF_FFFF) as u32, "entry {i} addr");
+            let wraps = (full >> 32) as u32;
+            if wraps > 0 {
+                saw_wrap = true;
+            }
+            assert_eq!(
+                page_size,
+                ((base as u64 + wraps as u64) & 0xFFFF_FFFF) as u32,
+                "entry {i} page_size"
+            );
+            full += base;
+            if i == 0 {
+                full -= 162;
+            }
+        }
+        assert!(saw_wrap, "test sizes should force at least one 2^32 wrap");
     }
 }

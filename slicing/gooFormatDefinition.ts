@@ -7,7 +7,10 @@ export const GOO_FORMAT_DEFINITION: SlicingFormatDefinition = {
   ownership: 'plugin',
   layerDataKind: 'raw-mask',
   pluginId: 'elegoo',
-  formatVersions: [],
+  formatVersions: [
+    { value: 'v1.2', label: 'GOO V1.2', isDefault: true },
+    { value: 'v5.1', label: 'GOO V5.1 (Jupiter 2)' }
+  ],
   settingsModes: [
     { value: 'simple', label: 'Simple', isDefault: true },
     { value: 'twostage', label: 'Two Stage' },
