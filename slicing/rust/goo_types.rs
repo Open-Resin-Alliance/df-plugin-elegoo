@@ -22,6 +22,20 @@ pub(super) const GOO_FILE_MAGIC: [u8; 8] = [0x07, 0x00, 0x00, 0x00, 0x44, 0x4C, 
 ///   End fields:         2+2+1+4+4+4+4+8+4+1+2      = 36
 pub(super) const GOO_HEADER_SIZE: u32 = 195477;
 
+/// Fixed per-layer definition size (bytes) preceding the RLE payload:
+///   Pause(2) + PausePositionZ(4) + PositionZ(4) + ExposureTime(4)
+///   + LightOffDelay(4) + WaitTimes(3×4) + Lift/Retract(8×4)
+///   + LightPWM(2) + DelimiterData(2) + DataLength(4) = 70
+pub(super) const GOO_LAYER_DEF_SIZE: usize = 70;
+
+/// Offset of the post-preview numeric block (LayerCount, ResolutionX/Y, …):
+/// pre-preview fields (194) + small preview (26912+2) + large preview (168200+2).
+pub(super) const GOO_LAYER_COUNT_OFFSET: u64 = 195_310;
+
+/// Offset of the LayerDefAddress header field ([59]): header end minus
+/// LayerDefAddress(4) + GrayScaleLevel(1) + TransitionLayerCount(2).
+pub(super) const GOO_LAYER_DEF_ADDRESS_OFFSET: u64 = GOO_HEADER_SIZE as u64 - 7;
+
 #[derive(Debug, Clone)]
 pub(super) struct GooPreparedLayer {
     pub index: usize,
@@ -78,4 +92,5 @@ pub(super) struct GooBuildModel {
     pub mirror_x: bool,
     pub mirror_y: bool,
     pub created_datetime: String,
+    pub machine_z_mm: f32,
 }
