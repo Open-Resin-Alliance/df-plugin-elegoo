@@ -335,12 +335,11 @@ pub(super) fn encode_panel_from_mask_window(
     )
 }
 
-// === Test-side decoders (ports of the spec §12 / §7.7 reference decoders) ===
+// === Reference decoders (ports of the spec §12 / §7.7 reference decoders) ===
 
 /// Validate the frame (`0x55` magic + checksum + CRLF) and return the chunk
 /// stream body.
-#[cfg(test)]
-fn unframe_block(block: &[u8]) -> Result<&[u8], String> {
+pub(super) fn unframe_block(block: &[u8]) -> Result<&[u8], String> {
     if block.len() < 4 || block[0] != GOO_LAYER_MAGIC {
         return Err("V5 block missing 0x55 magic".to_string());
     }
@@ -356,7 +355,6 @@ fn unframe_block(block: &[u8]) -> Result<&[u8], String> {
 }
 
 /// Decode one binary-grammar panel to a 0/255 mask (spec §12 reference).
-#[cfg(test)]
 pub(super) fn decode_panel_binary(block: &[u8], panel_pixels: usize) -> Result<Vec<u8>, String> {
     let body = unframe_block(block)?;
     let mut out = vec![0u8; panel_pixels];
@@ -415,7 +413,6 @@ pub(super) fn decode_panel_binary(block: &[u8], panel_pixels: usize) -> Result<V
 }
 
 /// Decode one VUF-grammar panel to grayscale levels (spec §7.7 table).
-#[cfg(test)]
 pub(super) fn decode_panel_vuf(
     block: &[u8],
     panel_pixels: usize,

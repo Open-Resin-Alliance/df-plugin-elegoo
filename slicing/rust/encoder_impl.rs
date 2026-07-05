@@ -22,7 +22,7 @@ use goo_metadata::{
     parse_threshold_from_job, parse_timing_model_from_job, GooFormatVersion,
 };
 use goo_v5::{build_goo_v5_container_bytes, build_goo_v5_container_bytes_with_progress};
-use goo_v5_rle::{encode_panel_from_mask_window, encode_panel_from_runs};
+use goo_v5_rle::{decode_panel_binary, decode_panel_vuf, encode_panel_from_mask_window, encode_panel_from_runs};
 use std::path::Path;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -765,6 +765,11 @@ pub fn read_layer_preview_png(path: &Path, layer_number: u32) -> Result<Vec<u8>,
         return Err("Goo file magic mismatch".to_string());
     }
 
+    // Version dispatch: V5.1 uses the LE DRAM-table layout.
+    if &head[0..4] == goo_types::GOO_V5_MAGIC {
+        return read_goo_v5_layer_preview_png(&mut file, layer_number);
+    }
+
     // Fixed post-preview numeric block: LayerCount, ResolutionX, ResolutionY.
     file.seek(SeekFrom::Start(goo_types::GOO_LAYER_COUNT_OFFSET))
         .map_err(|e| format!("Goo header seek failed: {e}"))?;
@@ -821,6 +826,127 @@ pub fn read_layer_preview_png(path: &Path, layer_number: u32) -> Result<Vec<u8>,
     let expected_pixels = width_px as usize * height_px as usize;
     let pixels = decode_goo_rle(&rle_bytes, expected_pixels)?;
     encode_pixels_as_grayscale_png(width_px, height_px, &pixels)
+}
+
+/// Reads a single layer preview from a GOO V5.1 file and returns it as a
+/// grayscale PNG. The caller has already validated the 12-byte header and
+/// positioned the cursor at byte 12.
+fn read_goo_v5_layer_preview_png(
+    file: &mut std::fs::File,
+    layer_number: u32,
+) -> Result<Vec<u8>, String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    // ── Numeric block (LE, at GOO_V5_PARAMS_OFFSET = 195 310) ──────────
+    file.seek(SeekFrom::Start(goo_types::GOO_V5_PARAMS_OFFSET as u64))
+        .map_err(|e| format!("Goo V5 params seek failed: {e}"))?;
+
+    let mut block = [0u8; 8];
+    file.read_exact(&mut block)
+        .map_err(|e| format!("Goo V5 params read failed: {e}"))?;
+    let layer_count = u32::from_le_bytes(block[0..4].try_into().unwrap());
+    let width_px = u16::from_le_bytes(block[4..6].try_into().unwrap()) as u32;
+    let height_px = u16::from_le_bytes(block[6..8].try_into().unwrap()) as u32;
+
+    if width_px == 0 || height_px == 0 {
+        return Err(format!(
+            "Goo V5 file reports invalid dimensions {width_px}×{height_px}"
+        ));
+    }
+    if layer_number > layer_count {
+        return Err(format!(
+            "Layer {layer_number} out of range (file has {layer_count} layers)"
+        ));
+    }
+
+    // ── Preamble: pixel_bit_width ──────────────────────────────────────
+    file.seek(SeekFrom::Start(
+        goo_types::GOO_V5_PREAMBLE_OFFSET as u64 + 14,
+    ))
+    .map_err(|e| format!("Goo V5 preamble seek failed: {e}"))?;
+    let mut pixel_bit_width = [0u8; 1];
+    file.read_exact(&mut pixel_bit_width)
+        .map_err(|e| format!("Goo V5 preamble read failed: {e}"))?;
+    let pixel_bit_width = pixel_bit_width[0];
+
+    // ── Compute structural offsets ─────────────────────────────────────
+    let l = layer_count as u64;
+    let ldt_start = goo_types::GOO_V5_LDT_START as u64; // 195 493
+    let t1_end = ldt_start + l * 8;
+    let defs_base = ldt_start + l * 24 + goo_types::GOO_V5_RDT_PAD_SIZE as u64;
+    let rle_start = defs_base + l * (goo_types::GOO_V5_LAYER_DEF_SIZE as u64);
+
+    let total_blocks = (l * 2) as usize; // 2 panels per layer
+
+    // ── Read T2 / IEDT block sizes ─────────────────────────────────────
+    file.seek(SeekFrom::Start(t1_end))
+        .map_err(|e| format!("Goo V5 IEDT seek failed: {e}"))?;
+    let mut t2_buf = vec![0u8; total_blocks * 8];
+    file.read_exact(&mut t2_buf)
+        .map_err(|e| format!("Goo V5 IEDT read failed: {e}"))?;
+
+    let mut block_sizes = Vec::with_capacity(total_blocks);
+    for entry in t2_buf.chunks_exact(8) {
+        let page_size =
+            u32::from_le_bytes(entry[4..8].try_into().unwrap());
+        block_sizes.push((page_size >> 8) as usize);
+    }
+
+    // ── Locate target layer's two panels ───────────────────────────────
+    let layer_index = (layer_number - 1) as usize;
+    let first_block = layer_index * 2;
+    let panel_offset: usize = block_sizes[..first_block].iter().sum();
+    let left_size = block_sizes[first_block];
+    let right_size = block_sizes[first_block + 1];
+    let total_read = left_size + right_size;
+
+    file.seek(SeekFrom::Start(rle_start + panel_offset as u64))
+        .map_err(|e| format!("Goo V5 RLE seek failed: {e}"))?;
+    let mut rle_buf = vec![0u8; total_read];
+    file.read_exact(&mut rle_buf)
+        .map_err(|e| format!("Goo V5 RLE read failed: {e}"))?;
+
+    let left_block = &rle_buf[..left_size];
+    let right_block = &rle_buf[left_size..];
+
+    // ── Decode panels ──────────────────────────────────────────────────
+    let half_width = (width_px as usize) / 2;
+    let panel_pixels = half_width * (height_px as usize);
+    let max_level: u8 = if pixel_bit_width >= 8 {
+        255
+    } else {
+        (1u16 << pixel_bit_width) as u8 - 1
+    };
+
+    let decode_panels = |left: &[u8], right: &[u8]| -> Result<(Vec<u8>, Vec<u8>), String> {
+        // Try VUF first (default / superset); fall back to binary.
+        match decode_panel_vuf(left, panel_pixels, max_level) {
+            Ok(lp) => match decode_panel_vuf(right, panel_pixels, max_level) {
+                Ok(rp) => return Ok((lp, rp)),
+                Err(_) => {}
+            },
+            Err(_) => {}
+        }
+        // Binary fallback
+        let lp = decode_panel_binary(left, panel_pixels)?;
+        let rp = decode_panel_binary(right, panel_pixels)?;
+        Ok((lp, rp))
+    };
+
+    let (left_pixels, right_pixels) = decode_panels(left_block, right_block)
+        .map_err(|e| format!("Goo V5 layer {layer_number} panel decode failed: {e}"))?;
+
+    // ── Interleave half-screen panels into full-width pixel buffer ─────
+    let full_pixels = (width_px as usize) * (height_px as usize);
+    let mut stacked = Vec::with_capacity(full_pixels);
+    for row in 0..(height_px as usize) {
+        let r0 = row * half_width;
+        let r1 = (row + 1) * half_width;
+        stacked.extend_from_slice(&left_pixels[r0..r1]);
+        stacked.extend_from_slice(&right_pixels[r0..r1]);
+    }
+
+    encode_pixels_as_grayscale_png(width_px, height_px, &stacked)
 }
 
 /// Decodes Goo run-length encoded layer data (0x55 magic + chunks +
@@ -942,7 +1068,7 @@ mod tests {
         GOO_FILE_MAGIC, GOO_FILE_VERSION, GOO_HEADER_SIZE, GOO_LAYER_COUNT_OFFSET,
         GOO_LAYER_DEF_ADDRESS_OFFSET, GOO_LAYER_DEF_SIZE,
     };
-    use super::{build_goo_container_bytes, decode_goo_rle};
+    use super::{build_goo_container_bytes, decode_goo_rle, read_layer_preview_png};
     use crate::types::SliceJobV3;
 
     fn make_test_job() -> SliceJobV3 {
@@ -1194,8 +1320,8 @@ mod tests {
 
     use super::goo_metadata::{parse_goo_format_version_hint, GooFormatVersion};
     use super::goo_types::{
-        GooV5PreparedLayer, GOO_V5_FOOTER_BLOB_SIZE, GOO_V5_LDT_MARKER, GOO_V5_LDT_START,
-        GOO_V5_MAGIC, GOO_V5_PARAMS_OFFSET, GOO_V5_PREAMBLE_OFFSET,
+        GooV5PreparedLayer, GOO_V5_FOOTER_BLOB_SIZE, GOO_V5_LDT_MARKER,
+        GOO_V5_LDT_START, GOO_V5_MAGIC, GOO_V5_PARAMS_OFFSET, GOO_V5_PREAMBLE_OFFSET,
     };
     use super::goo_v5::{build_goo_v5_container_bytes, write_goo_v5_t2};
     use super::goo_v5_rle::{decode_panel_binary, decode_panel_vuf, encode_panel_from_mask_window};
@@ -1448,5 +1574,175 @@ mod tests {
             }
         }
         assert!(saw_wrap, "test sizes should force at least one 2^32 wrap");
+    }
+
+    // ── V5.1 read_layer_preview_png round-trip tests ─────────────────────
+
+    /// Decode a grayscale PNG payload into (width, height, pixels).
+    fn decode_png_to_pixels(png_bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
+        let decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
+        let mut reader = decoder
+            .read_info()
+            .map_err(|e| format!("PNG read_info: {e}"))?;
+        let mut buf = vec![0u8; reader.output_buffer_size()];
+        let info = reader
+            .next_frame(&mut buf)
+            .map_err(|e| format!("PNG next_frame: {e}"))?;
+        let pixels = buf[..info.buffer_size()].to_vec();
+        Ok((info.width, info.height, pixels))
+    }
+
+    #[test]
+    fn goo_v5_read_layer_preview_png_vuf_round_trip() {
+        let job = make_v5_test_job();
+        // Layer 0: solid white. Layer 1: white band crossing the seam.
+        let mask0 = vec![255u8; 16];
+        let mut mask1 = vec![0u8; 16];
+        for row in 0..4 {
+            mask1[row * 4 + 1] = 255;
+            mask1[row * 4 + 2] = 255;
+        }
+        let prepared = make_v5_prepared(&job, &[mask0.clone(), mask1.clone()]);
+        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("goo_v5_preview_test_vuf.goo");
+        std::fs::write(&path, &bytes).expect("write");
+
+        // Layer 1
+        let png1 = read_layer_preview_png(&path, 1).expect("layer 1 preview");
+        let (w, h, pixels) = decode_png_to_pixels(&png1).expect("decode png");
+        assert_eq!(w, 4);
+        assert_eq!(h, 4);
+        let expected: Vec<u8> = mask0.iter().map(|&p| if p > 127 { 255 } else { 0 }).collect();
+        assert_eq!(pixels, expected, "layer 1 (solid white)");
+
+        // Layer 2
+        let png2 = read_layer_preview_png(&path, 2).expect("layer 2 preview");
+        let (w2, h2, pixels2) = decode_png_to_pixels(&png2).expect("decode png");
+        assert_eq!(w2, 4);
+        assert_eq!(h2, 4);
+        let expected2: Vec<u8> = mask1.iter().map(|&p| if p > 127 { 255 } else { 0 }).collect();
+        assert_eq!(pixels2, expected2, "layer 2 (cross-seam band)");
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn goo_v5_read_layer_preview_png_binary_round_trip() {
+        let mut job = make_v5_test_job();
+        job.metadata_json = r#"{
+            "material": {
+                "normalExposureSec": 2.0,
+                "bottomExposureSec": 20.0,
+                "bottomLayerCount": 1
+            },
+            "goo": { "v5RleMode": "binary" }
+        }"#
+        .to_string();
+
+        let mut mask = vec![0u8; 16];
+        mask[5] = 255;
+        mask[6] = 255;
+        let prepared = make_v5_prepared(&job, &[mask.clone()]);
+        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("goo_v5_preview_test_binary.goo");
+        std::fs::write(&path, &bytes).expect("write");
+
+        let png = read_layer_preview_png(&path, 1).expect("binary layer preview");
+        let (w, h, pixels) = decode_png_to_pixels(&png).expect("decode png");
+        assert_eq!(w, 4);
+        assert_eq!(h, 4);
+        let expected: Vec<u8> =
+            mask.iter().map(|&p| if p > 127 { 255 } else { 0 }).collect();
+        assert_eq!(pixels, expected, "binary-mode layer 1");
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn goo_v5_read_layer_preview_png_version_dispatch() {
+        // Build both a V1.2 and V5.1 file with the same simple mask; both
+        // should produce the same pixel output when decoded via
+        // read_layer_preview_png.
+        let pixels = (4 * 4) as usize;
+        let mask = vec![255u8; pixels];
+        let dir = std::env::temp_dir();
+
+        // ── V1.2 ──────────────────────────────────────────────────────
+        let job_v12 = make_test_job();
+        let prepared_v12 = make_prepared_layers(&job_v12, 1);
+        let bytes_v12 = build_goo_container_bytes(&job_v12, &prepared_v12).expect("v12");
+        let path_v12 = dir.join("goo_preview_dispatch_v12.goo");
+        std::fs::write(&path_v12, &bytes_v12).expect("write v12");
+
+        let png_v12 = read_layer_preview_png(&path_v12, 1).expect("v12 layer 1");
+        let (w12, h12, px12) = decode_png_to_pixels(&png_v12).expect("v12 png");
+        assert_eq!((w12, h12), (4, 4));
+        assert!(px12.iter().all(|&p| p == 255), "v12 all white");
+
+        // ── V5.1 ──────────────────────────────────────────────────────
+        let job_v51 = make_v5_test_job();
+        let prepared_v51 = make_v5_prepared(&job_v51, &[mask.clone()]);
+        let bytes_v51 = build_goo_v5_container_bytes(&job_v51, &prepared_v51).expect("v51");
+        let path_v51 = dir.join("goo_preview_dispatch_v51.goo");
+        std::fs::write(&path_v51, &bytes_v51).expect("write v51");
+
+        let png_v51 = read_layer_preview_png(&path_v51, 1).expect("v51 layer 1");
+        let (w51, h51, px51) = decode_png_to_pixels(&png_v51).expect("v51 png");
+        assert_eq!((w51, h51), (4, 4));
+        assert!(px51.iter().all(|&p| p == 255), "v51 all white");
+
+        // Both versions produce the identical pixel buffer.
+        assert_eq!(px12, px51);
+
+        let _ = std::fs::remove_file(&path_v12);
+        let _ = std::fs::remove_file(&path_v51);
+    }
+
+    #[test]
+    fn goo_v5_read_layer_preview_png_error_cases() {
+        let job = make_v5_test_job();
+        let mask = vec![0u8; 16];
+        let prepared = make_v5_prepared(&job, &[mask]);
+        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("goo_v5_preview_errors.goo");
+        std::fs::write(&path, &bytes).expect("write");
+
+        // Layer 0
+        assert!(read_layer_preview_png(&path, 0).is_err());
+
+        // Out-of-range layer
+        assert!(read_layer_preview_png(&path, 99).is_err());
+
+        let _ = std::fs::remove_file(&path);
+
+        // Non-existent file
+        let bad = dir.join("goo_v5_nonexistent.goo");
+        assert!(read_layer_preview_png(&bad, 1).is_err());
+    }
+
+    #[test]
+    fn goo_v5_read_layer_preview_png_empty_layer() {
+        // All-black layer: the encoder emits a single black run per panel.
+        let job = make_v5_test_job();
+        let mask = vec![0u8; 16];
+        let prepared = make_v5_prepared(&job, &[mask.clone()]);
+        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("goo_v5_preview_empty.goo");
+        std::fs::write(&path, &bytes).expect("write");
+
+        let png = read_layer_preview_png(&path, 1).expect("empty layer");
+        let (w, h, pixels) = decode_png_to_pixels(&png).expect("decode png");
+        assert_eq!((w, h), (4, 4));
+        assert!(pixels.iter().all(|&p| p == 0), "all-black layer");
+
+        let _ = std::fs::remove_file(&path);
     }
 }
