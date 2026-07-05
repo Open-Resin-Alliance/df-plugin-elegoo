@@ -1,5 +1,5 @@
 {
-    "$inherit": "betaonestep",
+    "$inherit": "simple",
     "$remove":
     {
         "fields": [
@@ -13,4 +13,5 @@
             "retractSpeedMmMin"
         ]   
     }
+
 }
