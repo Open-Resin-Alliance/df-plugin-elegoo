@@ -82,10 +82,7 @@ fn write_goo_v5_layer_def(
     let (
         exposure, light_off, w_after_cure, w_after_lift, w_before_cure,
         lift_h, lift_s, lift_h2, lift_s2,
-        //ret_h, 
-        ret_s, 
-        //ret_h2, 
-        ret_s2,
+        ret_h, ret_s, ret_h2, ret_s2,
         pwm,
     ) = if is_bottom {
         (
@@ -98,9 +95,9 @@ fn write_goo_v5_layer_def(
             timing.bottom_lift_speed_mm_min,
             timing.bottom_lift_distance2_mm,
             timing.bottom_lift_speed2_mm_min,
-            //timing.bottom_retract_distance_mm,
+            timing.bottom_retract_distance_mm,
             timing.bottom_retract_speed_mm_min,
-            // timing.bottom_retract_distance2_mm,
+            timing.bottom_retract_distance2_mm,
             timing.bottom_retract_speed2_mm_min,
             timing.bottom_light_pwm,
         )
@@ -115,15 +112,13 @@ fn write_goo_v5_layer_def(
             timing.lift_speed_mm_min,
             timing.lift_distance2_mm,
             timing.lift_speed2_mm_min,
-            //timing.retract_distance_mm,
+            timing.retract_distance_mm,
             timing.retract_speed_mm_min,
-            // timing.retract_distance2_mm,
+            timing.retract_distance2_mm,
             timing.retract_speed2_mm_min,
             timing.light_pwm,
         )
     };
-
-    let ret_height = lift_h + lift_h2 - layer_height_mm; // V5.1 spec §6.1: retract distance 2 = lift distance 1 + lift distance 2 − layer height
 
     let def_start = out.len();
 
@@ -139,9 +134,9 @@ fn write_goo_v5_layer_def(
     push_f32_le(out, lift_s);                                   // Lift speed
     push_f32_le(out, lift_h2);                                  // Lift distance 2
     push_f32_le(out, lift_s2);                                  // Lift speed 2
-    push_f32_le(out, 0.0);                                    // Retract distance
+    push_f32_le(out, ret_h);                                    // Retract distance
     push_f32_le(out, ret_s);                                    // Retract speed
-    push_f32_le(out, ret_height);                                   // Retract distance 2
+    push_f32_le(out, ret_h2);                                   // Retract distance 2
     push_f32_le(out, ret_s2);                                   // Retract speed 2
     push_u16_le(out, pwm);                                      // Light PWM
     push_crlf(out);                                             // Delimiter
@@ -177,7 +172,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
         }
     }
 
-    let timing = parse_timing_model_from_job(job);
+    let mut timing = parse_timing_model_from_job(job);
     let build = parse_goo_build_model_from_job(job);
     let v5 = parse_goo_v5_settings_from_job(job);
     let software_version = parse_software_info_from_metadata(&job.metadata_json);
@@ -202,6 +197,14 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
 
     let mut out =
         Vec::with_capacity(end_of_rle as usize + GOO_V5_FOOTER_BLOB_SIZE + 32);
+
+    if timing.bottom_retract_distance2_mm <= job.layer_height_mm && timing.retract_distance2_mm <= job.layer_height_mm {
+        timing.bottom_retract_distance2_mm -= job.layer_height_mm;
+        timing.retract_distance2_mm -= job.layer_height_mm;
+    } else {
+        timing.bottom_retract_distance_mm -= job.layer_height_mm;
+        timing.retract_distance_mm -= job.layer_height_mm;
+    }
 
     // ── Header + previews (0 .. 195,310) ──────────────────────────────────
     out.extend_from_slice(GOO_V5_MAGIC);               // "V5.1"
