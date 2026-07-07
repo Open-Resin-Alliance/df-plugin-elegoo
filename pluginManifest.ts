@@ -26,9 +26,9 @@ export const ELEGOO_PLUGIN_MANIFEST = {
   author: 'Open Resin Alliance',
   homepage: 'https://github.com/Open-Resin-Alliance/df-plugin-elegoo',
   printerPresets: [
-    ...mapPresets(elegooMarsPrinters as any[]),
-    ...mapPresets(elegooSaturnPrinters as any[]),
     ...mapPresets(elegooJupiterPrinters as any[]),
+    ...mapPresets(elegooSaturnPrinters as any[]),
+    ...mapPresets(elegooMarsPrinters as any[]),
   ],
   materialTemplates: [],
 };

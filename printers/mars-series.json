@@ -1,79 +1,19 @@
 [
   {
-    "presetId": "elegoo-mars-3-ctb",
-    "profileVersion": 1,
+    "presetId": "elegoo-mars-5-ultra-ctb",
+    "profileVersion": 3,
     "manufacturer": "ELEGOO",
     "family": "Mars",
-    "name": "Mars 3",
-    "imageAssetPath": "./assets/mars/mars-3.png",
+    "name": "Mars 5 Ultra",
+    "imageAssetPath": "./assets/mars/mars-5-ultra.png",
     "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Mars 3",
+    "hasCamera": true,
+    "networkSupport": "sdcp",
+    "networkFilter": "Mars 5",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 175
-    },
-    "pixelSize": {
-      "x": 35,
-      "y": 35
-    },
-    "display": {
-      "resolutionX": 4098,
-      "resolutionY": 2560,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
-      "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
-    "presetId": "elegoo-mars-3-pro-ctb",
-    "profileVersion": 1,
-    "manufacturer": "ELEGOO",
-    "family": "Mars",
-    "name": "Mars 3 Pro",
-    "imageAssetPath": "./assets/mars/mars-3.png",
-    "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Mars 3",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 175
-    },
-    "pixelSize": {
-      "x": 35,
-      "y": 35
-    },
-    "display": {
-      "resolutionX": 4098,
-      "resolutionY": 2560,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
-      "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
-    "presetId": "elegoo-mars-4-goo",
-    "profileVersion": 1,
-    "manufacturer": "ELEGOO",
-    "family": "Mars",
-    "name": "Mars 4",
-    "imageAssetPath": "./assets/mars/mars-4.png",
-    "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Mars 4",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 175
+      "height": 165
     },
     "pixelSize": {
       "x": 18,
@@ -82,64 +22,36 @@
     "display": {
       "resolutionX": 8520,
       "resolutionY": 4320,
-      "outputFormat": ".goo",
-      "settingsMode": "twostage",
+      "outputFormat": ".ctb",
+      "formatVersion": "v5enc",
+      "settingsMode": "tilting",
       "mirrorX": true,
       "mirrorY": false
     }
   },
   {
-    "presetId": "elegoo-mars-4-dlp-goo",
+    "presetId": "elegoo-mars-5-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
-    "name": "Mars 4 DLP",
-    "imageAssetPath": "./assets/mars/mars-4-max.png",
+    "name": "Mars 5",
+    "imageAssetPath": "./assets/mars/mars-5.png",
     "antiAliasing": true,
     "hasCamera": false,
     "networkSupport": null,
-    "networkFilter": "Mars 4",
+    "networkFilter": "Mars 5",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 150
+      "height": 165
     },
     "pixelSize": {
-      "x": 51.875,
-      "y": 51.875
+      "x": 35,
+      "y": 35
     },
     "display": {
-      "resolutionX": 2560,
-      "resolutionY": 1440,
-      "outputFormat": ".goo",
-      "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
-    "presetId": "elegoo-mars-4-max-goo",
-    "profileVersion": 1,
-    "manufacturer": "ELEGOO",
-    "family": "Mars",
-    "name": "Mars 4 Max",
-    "imageAssetPath": "./assets/mars/mars-4-max.png",
-    "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Mars 4",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 150
-    },
-    "pixelSize": {
-      "x": 34,
-      "y": 34
-    },
-    "display": {
-      "resolutionX": 5760,
-      "resolutionY": 3600,
+      "resolutionX": 4098,
+      "resolutionY": 2560,
       "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
@@ -177,28 +89,28 @@
     }
   },
   {
-    "presetId": "elegoo-mars-5-goo",
+    "presetId": "elegoo-mars-4-max-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
-    "name": "Mars 5",
-    "imageAssetPath": "./assets/mars/mars-5.png",
+    "name": "Mars 4 Max",
+    "imageAssetPath": "./assets/mars/mars-4-max.png",
     "antiAliasing": true,
     "hasCamera": false,
     "networkSupport": null,
-    "networkFilter": "Mars 5",
+    "networkFilter": "Mars 4",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 165
+      "height": 150
     },
     "pixelSize": {
-      "x": 35,
-      "y": 35
+      "x": 34,
+      "y": 34
     },
     "display": {
-      "resolutionX": 4098,
-      "resolutionY": 2560,
+      "resolutionX": 5760,
+      "resolutionY": 3600,
       "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
@@ -206,20 +118,49 @@
     }
   },
   {
-    "presetId": "elegoo-mars-5-ultra-ctb",
-    "profileVersion": 3,
+    "presetId": "elegoo-mars-4-dlp-goo",
+    "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Mars",
-    "name": "Mars 5 Ultra",
-    "imageAssetPath": "./assets/mars/mars-5-ultra.png",
+    "name": "Mars 4 DLP",
+    "imageAssetPath": "./assets/mars/mars-4-max.png",
     "antiAliasing": true,
-    "hasCamera": true,
-    "networkSupport": "sdcp",
-    "networkFilter": "Mars 5",
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Mars 4",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 165
+      "height": 150
+    },
+    "pixelSize": {
+      "x": 51.875,
+      "y": 51.875
+    },
+    "display": {
+      "resolutionX": 2560,
+      "resolutionY": 1440,
+      "outputFormat": ".goo",
+      "settingsMode": "twostage",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  },
+  {
+    "presetId": "elegoo-mars-4-goo",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Mars",
+    "name": "Mars 4",
+    "imageAssetPath": "./assets/mars/mars-4.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Mars 4",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 175
     },
     "pixelSize": {
       "x": 18,
@@ -228,9 +169,68 @@
     "display": {
       "resolutionX": 8520,
       "resolutionY": 4320,
+      "outputFormat": ".goo",
+      "settingsMode": "twostage",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  },
+  {
+    "presetId": "elegoo-mars-3-pro-ctb",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Mars",
+    "name": "Mars 3 Pro",
+    "imageAssetPath": "./assets/mars/mars-3.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Mars 3",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 175
+    },
+    "pixelSize": {
+      "x": 35,
+      "y": 35
+    },
+    "display": {
+      "resolutionX": 4098,
+      "resolutionY": 2560,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
-      "settingsMode": "tilting",
+      "settingsMode": "twostage",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  },
+  {
+    "presetId": "elegoo-mars-3-ctb",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Mars",
+    "name": "Mars 3",
+    "imageAssetPath": "./assets/mars/mars-3.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Mars 3",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 175
+    },
+    "pixelSize": {
+      "x": 35,
+      "y": 35
+    },
+    "display": {
+      "resolutionX": 4098,
+      "resolutionY": 2560,
+      "outputFormat": ".ctb",
+      "formatVersion": "v5enc",
+      "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
     }

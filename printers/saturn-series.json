@@ -1,56 +1,119 @@
 [
   {
-    "presetId": "elegoo-saturn-2-ctb",
-    "profileVersion": 1,
+    "presetId": "elegoo-saturn-4-ultra-16k-ctb",
+    "profileVersion": 4,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
-    "name": "Saturn 2",
-    "imageAssetPath": "./assets/saturn/saturn-2.png",
+    "name": "Saturn 4 Ultra 16K",
+    "imageAssetPath": "./assets/saturn/saturn-4-ultra-16k.png",
     "antiAliasing": true,
     "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Saturn 2",
+    "networkSupport": "sdcp",
+    "networkFilter": "Saturn 4",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 250
+      "height": 220
     },
     "pixelSize": {
-      "x": 28.5,
-      "y": 28.5
+      "x": 14,
+      "y": 19
+    },
+    "bitDepth": {
+      "bits": 3,
+      "description": "3-bit color depth, suboptimal for grayscale"
     },
     "display": {
-      "resolutionX": 7680,
-      "resolutionY": 4320,
+      "resolutionX": 15120,
+      "resolutionY": 6230,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
+      "settingsMode": "tilting",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  },
+  {
+    "presetId": "elegoo-saturn-4-ultra-ctb",
+    "profileVersion": 3,
+    "manufacturer": "ELEGOO",
+    "family": "Saturn",
+    "name": "Saturn 4 Ultra",
+    "imageAssetPath": "./assets/saturn/saturn-4-ultra.png",
+    "antiAliasing": true,
+    "hasCamera": true,
+    "networkSupport": "sdcp",
+    "networkFilter": "Saturn 4",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 220
+    },
+    "pixelSize": {
+      "x": 19,
+      "y": 24
+    },
+    "display": {
+      "resolutionX": 11520,
+      "resolutionY": 5120,
+      "outputFormat": ".ctb",
+      "formatVersion": "v5enc",
+      "settingsMode": "tilting",
+      "mirrorX": true,
+      "mirrorY": false
+    }
+  },
+  {
+    "presetId": "elegoo-saturn-4-goo",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Saturn",
+    "name": "Saturn 4",
+    "imageAssetPath": "./assets/saturn/saturn-4.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Saturn 4",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 220
+    },
+    "pixelSize": {
+      "x": 19,
+      "y": 24
+    },
+    "display": {
+      "resolutionX": 11520,
+      "resolutionY": 5120,
+      "outputFormat": ".goo",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
     }
   },
   {
-    "presetId": "elegoo-saturn-2-14k-ctb",
+    "presetId": "elegoo-saturn-3-ultra-ctb",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
-    "name": "Saturn 2 14K",
-    "imageAssetPath": "./assets/saturn/saturn-2.png",
+    "name": "Saturn 3 Ultra",
+    "imageAssetPath": "./assets/saturn/saturn-3-ultra.png",
     "antiAliasing": true,
     "hasCamera": false,
-    "networkSupport": null,
-    "networkFilter": "Saturn 2",
+    "networkSupport": "sdcp",
+    "networkFilter": "Saturn 3",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 250
+      "height": 260
     },
     "pixelSize": {
-      "x": 16.8,
-      "y": 24.8
+      "x": 19,
+      "y": 24
     },
     "display": {
-      "resolutionX": 13320,
+      "resolutionX": 11520,
       "resolutionY": 5120,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
@@ -90,124 +153,61 @@
     }
   },
   {
-    "presetId": "elegoo-saturn-3-ultra-ctb",
+    "presetId": "elegoo-saturn-2-14k-ctb",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
-    "name": "Saturn 3 Ultra",
-    "imageAssetPath": "./assets/saturn/saturn-3-ultra.png",
-    "antiAliasing": true,
-    "hasCamera": false,
-    "networkSupport": "sdcp",
-    "networkFilter": "Saturn 3",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 260
-    },
-    "pixelSize": {
-      "x": 19,
-      "y": 24
-    },
-    "display": {
-      "resolutionX": 11520,
-      "resolutionY": 5120,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
-      "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
-    "presetId": "elegoo-saturn-4-goo",
-    "profileVersion": 1,
-    "manufacturer": "ELEGOO",
-    "family": "Saturn",
-    "name": "Saturn 4",
-    "imageAssetPath": "./assets/saturn/saturn-4.png",
+    "name": "Saturn 2 14K",
+    "imageAssetPath": "./assets/saturn/saturn-2.png",
     "antiAliasing": true,
     "hasCamera": false,
     "networkSupport": null,
-    "networkFilter": "Saturn 4",
+    "networkFilter": "Saturn 2",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 220
+      "height": 250
     },
     "pixelSize": {
-      "x": 19,
-      "y": 24
+      "x": 16.8,
+      "y": 24.8
     },
     "display": {
-      "resolutionX": 11520,
+      "resolutionX": 13320,
       "resolutionY": 5120,
-      "outputFormat": ".goo",
+      "outputFormat": ".ctb",
+      "formatVersion": "v5enc",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
     }
   },
   {
-    "presetId": "elegoo-saturn-4-ultra-ctb",
-    "profileVersion": 3,
+    "presetId": "elegoo-saturn-2-ctb",
+    "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
-    "name": "Saturn 4 Ultra",
-    "imageAssetPath": "./assets/saturn/saturn-4-ultra.png",
-    "antiAliasing": true,
-    "hasCamera": true,
-    "networkSupport": "sdcp",
-    "networkFilter": "Saturn 4",
-    "buildVolumeMm": {
-      "width": null,
-      "depth": null,
-      "height": 220
-    },
-    "pixelSize": {
-      "x": 19,
-      "y": 24
-    },
-    "display": {
-      "resolutionX": 11520,
-      "resolutionY": 5120,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5enc",
-      "settingsMode": "tilting",
-      "mirrorX": true,
-      "mirrorY": false
-    }
-  },
-  {
-    "presetId": "elegoo-saturn-4-ultra-16k-ctb",
-    "profileVersion": 4,
-    "manufacturer": "ELEGOO",
-    "family": "Saturn",
-    "name": "Saturn 4 Ultra 16K",
-    "imageAssetPath": "./assets/saturn/saturn-4-ultra-16k.png",
+    "name": "Saturn 2",
+    "imageAssetPath": "./assets/saturn/saturn-2.png",
     "antiAliasing": true,
     "hasCamera": false,
-    "networkSupport": "sdcp",
-    "networkFilter": "Saturn 4",
+    "networkSupport": null,
+    "networkFilter": "Saturn 2",
     "buildVolumeMm": {
       "width": null,
       "depth": null,
-      "height": 220
+      "height": 250
     },
     "pixelSize": {
-      "x": 14,
-      "y": 19
-    },
-    "bitDepth": {
-      "bits": 3,
-      "description": "3-bit color depth, suboptimal for grayscale"
+      "x": 28.5,
+      "y": 28.5
     },
     "display": {
-      "resolutionX": 15120,
-      "resolutionY": 6230,
+      "resolutionX": 7680,
+      "resolutionY": 4320,
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
-      "settingsMode": "tilting",
+      "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
     }

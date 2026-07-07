@@ -1,29 +1,33 @@
 [
   {
-    "presetId": "elegoo-jupiter-ctb",
+    "presetId": "elegoo-jupiter-2-goo",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Jupiter",
-    "name": "Jupiter",
-    "imageAssetPath": "./assets/jupiter/jupiter.png",
+    "name": "Jupiter 2",
+    "imageAssetPath": "./assets/jupiter/jupiter2.png",
     "antiAliasing": true,
     "hasCamera": false,
     "networkSupport": null,
     "networkFilter": "Jupiter",
     "buildVolumeMm": {
-      "width": null,
-      "depth": null,
+      "width": 302.4,
+      "depth": 161.98,
       "height": 300
     },
     "pixelSize": {
-      "x": 51,
-      "y": 51
+      "x": 20,
+      "y": 26
+    },
+    "bitDepth": {
+      "bits": 3,
+      "description": "3-bit color depth, suboptimal for grayscale"
     },
     "display": {
-      "resolutionX": 5448,
-      "resolutionY": 3064,
-      "outputFormat": ".ctb",
-      "formatVersion": "v5",
+      "resolutionX": 15120,
+      "resolutionY": 6230,
+      "outputFormat": ".goo",
+      "formatVersion": "v5.1",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
@@ -60,34 +64,30 @@
     }
   },
   {
-    "presetId": "elegoo-jupiter-2-goo",
+    "presetId": "elegoo-jupiter-ctb",
     "profileVersion": 1,
     "manufacturer": "ELEGOO",
     "family": "Jupiter",
-    "name": "Jupiter 2",
-    "imageAssetPath": "./assets/jupiter/jupiter2.png",
+    "name": "Jupiter",
+    "imageAssetPath": "./assets/jupiter/jupiter.png",
     "antiAliasing": true,
     "hasCamera": false,
     "networkSupport": null,
     "networkFilter": "Jupiter",
     "buildVolumeMm": {
-      "width": 302.4,
-      "depth": 161.98,
+      "width": null,
+      "depth": null,
       "height": 300
     },
     "pixelSize": {
-      "x": 20,
-      "y": 26
-    },
-    "bitDepth": {
-      "bits": 3,
-      "description": "3-bit color depth, suboptimal for grayscale"
+      "x": 51,
+      "y": 51
     },
     "display": {
-      "resolutionX": 15120,
-      "resolutionY": 6230,
-      "outputFormat": ".goo",
-      "formatVersion": "v5.1",
+      "resolutionX": 5448,
+      "resolutionY": 3064,
+      "outputFormat": ".ctb",
+      "formatVersion": "v5",
       "settingsMode": "twostage",
       "mirrorX": true,
       "mirrorY": false
