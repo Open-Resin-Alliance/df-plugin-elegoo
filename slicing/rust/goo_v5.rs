@@ -267,7 +267,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
     push_f32_le(&mut out, timing.retract_speed2_mm_min);
     push_u16_le(&mut out, timing.bottom_light_pwm);
     push_u16_le(&mut out, timing.light_pwm);
-    push_u8(&mut out, 1); // advance/per-layer mode: dynamic (real per-layer defs)
+    push_u8(&mut out, 0); // advance/per-layer mode: dynamic (real per-layer defs)
     push_u32_le(&mut out, print_time_sec);
     push_f32_le(&mut out, 0.0); // total volume
     push_f32_le(&mut out, 0.0); // total weight
