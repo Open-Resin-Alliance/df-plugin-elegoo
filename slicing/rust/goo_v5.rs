@@ -198,13 +198,13 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
     let mut out =
         Vec::with_capacity(end_of_rle as usize + GOO_V5_FOOTER_BLOB_SIZE + 32);
 
-    if timing.bottom_retract_distance2_mm >= job.layer_height_mm && timing.retract_distance2_mm >= job.layer_height_mm {
-        timing.bottom_retract_distance2_mm -= job.layer_height_mm;
-        timing.retract_distance2_mm -= job.layer_height_mm;
-    } else {
-        timing.bottom_retract_distance_mm -= job.layer_height_mm;
-        timing.retract_distance_mm -= job.layer_height_mm;
-    }
+    // if timing.bottom_retract_distance2_mm >= job.layer_height_mm && timing.retract_distance2_mm >= job.layer_height_mm {
+    //     timing.bottom_retract_distance2_mm -= job.layer_height_mm;
+    //     timing.retract_distance2_mm -= job.layer_height_mm;
+    // } else {
+    //     timing.bottom_retract_distance_mm -= job.layer_height_mm;
+    //     timing.retract_distance_mm -= job.layer_height_mm;
+    // }
 
     // ── Header + previews (0 .. 195,310) ──────────────────────────────────
     out.extend_from_slice(GOO_V5_MAGIC);               // "V5.1"
