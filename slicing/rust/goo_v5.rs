@@ -172,7 +172,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
         }
     }
 
-    let mut timing = parse_timing_model_from_job(job);
+    let timing = parse_timing_model_from_job(job);
     let build = parse_goo_build_model_from_job(job);
     let v5 = parse_goo_v5_settings_from_job(job);
     let software_version = parse_software_info_from_metadata(&job.metadata_json);
