@@ -234,5 +234,35 @@
       "mirrorX": true,
       "mirrorY": false
     }
+  },
+  {
+    "presetId": "elegoo-mars-2-ctb",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Mars",
+    "name": "Mars 2",
+    "imageAssetPath": "./assets/mars/mars-2.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Mars 2",
+    "buildVolumeMm": {
+      "width": null,
+      "depth": null,
+      "height": 150
+    },
+    "pixelSize": {
+      "x": 51,
+      "y": 51
+    },
+    "display": {
+      "resolutionX": 1620,
+      "resolutionY": 2560,
+      "outputFormat": ".ctb",
+      "formatVersion": "v4",
+      "settingsMode": "simple",
+      "mirrorX": true,
+      "mirrorY": false
+    }
   }
 ]
