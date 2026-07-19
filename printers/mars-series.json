@@ -259,18 +259,7 @@
       "resolutionX": 1620,
       "resolutionY": 2560,
       "outputFormat": ".ctb",
-      "formatVersion": "v4",
-      "formatVersionOptions": [
-        {
-          "value": "v4",
-          "label": "V4 (Firmware 4.4+)",
-          "isDefault": true
-        },
-        {
-          "value": "v3",
-          "label": "V3 (Firmware 4.3.x)"
-        }
-      ],
+      "formatVersion": "v3",
       "settingsMode": "simple",
       "mirrorX": true,
       "mirrorY": false
