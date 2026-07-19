@@ -172,7 +172,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
         }
     }
 
-    let mut timing = parse_timing_model_from_job(job);
+    let timing = parse_timing_model_from_job(job);
     let build = parse_goo_build_model_from_job(job);
     let v5 = parse_goo_v5_settings_from_job(job);
     let software_version = parse_software_info_from_metadata(&job.metadata_json);
@@ -197,14 +197,6 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
 
     let mut out =
         Vec::with_capacity(end_of_rle as usize + GOO_V5_FOOTER_BLOB_SIZE + 32);
-
-    if timing.bottom_retract_distance2_mm <= job.layer_height_mm && timing.retract_distance2_mm <= job.layer_height_mm {
-        timing.bottom_retract_distance2_mm -= job.layer_height_mm;
-        timing.retract_distance2_mm -= job.layer_height_mm;
-    } else {
-        timing.bottom_retract_distance_mm -= job.layer_height_mm;
-        timing.retract_distance_mm -= job.layer_height_mm;
-    }
 
     // ── Header + previews (0 .. 195,310) ──────────────────────────────────
     out.extend_from_slice(GOO_V5_MAGIC);               // "V5.1"
@@ -267,7 +259,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
     push_f32_le(&mut out, timing.retract_speed2_mm_min);
     push_u16_le(&mut out, timing.bottom_light_pwm);
     push_u16_le(&mut out, timing.light_pwm);
-    push_u8(&mut out, 1); // advance/per-layer mode: dynamic (real per-layer defs)
+    push_u8(&mut out, 0); // advance/per-layer mode: dynamic (real per-layer defs)
     push_u32_le(&mut out, print_time_sec);
     push_f32_le(&mut out, 0.0); // total volume
     push_f32_le(&mut out, 0.0); // total weight
