@@ -234,5 +234,39 @@
       "mirrorX": true,
       "mirrorY": false
     }
+  },
+  {
+    "presetId": "elegoo-mars-2-pro-ctb",
+    "profileVersion": 1,
+    "manufacturer": "ELEGOO",
+    "family": "Mars",
+    "name": "Mars 2 Pro",
+    "imageAssetPath": "./assets/mars/mars-2-pro.png",
+    "antiAliasing": true,
+    "hasCamera": false,
+    "networkSupport": null,
+    "networkFilter": "Mars 2",
+    "buildVolumeMm": {
+      "width": 130.56,
+      "depth": 82.62,
+      "height": 160
+    },
+    "pixelSize": {
+      "x": 51,
+      "y": 51
+    },
+    "bitDepth": {
+      "bits": 4,
+      "description": "4-bit color depth, 16 grayscale levels for anti-aliasing"
+    },
+    "display": {
+      "resolutionX": 2560,
+      "resolutionY": 1620,
+      "outputFormat": ".ctb",
+      "formatVersion": "v2",
+      "settingsMode": "simple",
+      "mirrorX": false,
+      "mirrorY": false
+    }
   }
 ]
