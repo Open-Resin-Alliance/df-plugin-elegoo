@@ -10,7 +10,7 @@ function resolvePresetImagePath(imageAssetPath: unknown): string | undefined {
   return `/plugins/elegoo/printers/${normalized}`;
 }
 
-function mapPresets(presets: any[]) {
+function mapPresets(presets: Record<string, unknown>[]) {
   return presets.map((preset) => ({
     ...preset,
     imageAssetPath: resolvePresetImagePath(preset.imageAssetPath),
@@ -26,9 +26,9 @@ export const ELEGOO_PLUGIN_MANIFEST = {
   author: 'Open Resin Alliance',
   homepage: 'https://github.com/Open-Resin-Alliance/df-plugin-elegoo',
   printerPresets: [
-    ...mapPresets(elegooJupiterPrinters as any[]),
-    ...mapPresets(elegooSaturnPrinters as any[]),
-    ...mapPresets(elegooMarsPrinters as any[]),
+    ...mapPresets(elegooJupiterPrinters as Record<string, unknown>[]),
+    ...mapPresets(elegooSaturnPrinters as Record<string, unknown>[]),
+    ...mapPresets(elegooMarsPrinters as Record<string, unknown>[]),
   ],
   materialTemplates: [],
 };
