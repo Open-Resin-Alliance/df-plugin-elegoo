@@ -1147,11 +1147,12 @@ mod tests {
     }
 
     #[test]
-    fn metadata_timing_reads_shared_ctb_namespace() {
-        // The differential material settings contract writes some GOO fields
-        // under `ctb.*` (see plugins/elegoo/materialSettings/*.json).
+    fn metadata_timing_reads_wait_times_from_goo_namespace() {
+        // Wait times live under `goo.*` with every other GOO field. Nothing
+        // writes GOO fields under `ctb.*`: that lookup was a leftover from
+        // sharing the CTB plugin's code layout, and it is gone.
         let meta = r#"{
-            "ctb": {
+            "goo": {
                 "waitTimeBeforeCureSec": 1.5,
                 "waitTimeAfterCureSec": 0.5,
                 "bottomWaitTimeAfterLiftSec": 2.0
