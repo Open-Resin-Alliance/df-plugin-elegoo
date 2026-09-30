@@ -10,8 +10,8 @@ use md5::{Digest, Md5};
 use super::goo_encoder::compute_print_time_seconds;
 use super::goo_layout::{push_crlf, push_str_fixed, push_u8};
 use super::goo_metadata::{
-    parse_goo_build_model_from_job, parse_goo_v5_settings_from_job,
-    parse_software_info_from_metadata, parse_timing_model_from_job,
+    parse_goo_build_model_from_job, parse_goo_v5_settings_from_job, parse_timing_model_from_job,
+    parse_v5_software_version_from_metadata,
 };
 use super::goo_preview::build_goo_previews;
 use super::goo_types::{
@@ -175,7 +175,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
     let timing = parse_timing_model_from_job(job);
     let build = parse_goo_build_model_from_job(job);
     let v5 = parse_goo_v5_settings_from_job(job);
-    let software_version = parse_software_info_from_metadata(&job.metadata_json);
+    let software_version = parse_v5_software_version_from_metadata(&job.metadata_json);
 
     let previews = build_goo_previews(job.export_thumbnail_png_base64.as_deref())?;
 
