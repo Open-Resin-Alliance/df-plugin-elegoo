@@ -509,13 +509,76 @@ pub(super) fn parse_threshold_from_job(job: &SliceJobV3) -> u8 {
     parse_threshold_from_metadata(&job.metadata_json)
 }
 
+/// The version the classic header writes beside its hardcoded "DragonFruit": the
+/// app's, as the job reports it under `slicer.version`, unless `goo.softwareVersion`
+/// overrides it. This file is compiled into the slicing engine, so
+/// `crate::ENGINE_VERSION` here is the engine's version, not the app's; with neither
+/// in the job, write none.
 pub(super) fn parse_software_info_from_metadata(metadata_json: &str) -> String {
     let Some(meta) = parse_json(metadata_json) else {
-        return crate::ENGINE_VERSION.to_string();
+        return String::new();
     };
-    meta.get("goo")
-        .and_then(|o| o.get("softwareVersion"))
-        .and_then(Value::as_str)
+    str_field(&meta, "goo", "softwareVersion")
+        .or_else(|| str_field(&meta, "slicer", "version"))
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// The version the V5.1 header writes beside its slicer name. That name is
+/// SatelLite's by default (`GOO_V5_DEFAULT_SLICER_NAME`), which the Jupiter 2 needs
+/// to accept the file, so the version belongs to the same borrowed identity and says
+/// nothing about DragonFruit. It stays what the printer is known to accept: the
+/// engine's version, unless `goo.softwareVersion` overrides it.
+pub(super) fn parse_v5_software_version_from_metadata(metadata_json: &str) -> String {
+    parse_json(metadata_json)
+        .as_ref()
+        .and_then(|meta| str_field(meta, "goo", "softwareVersion"))
         .unwrap_or(crate::ENGINE_VERSION)
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_software_info_from_metadata, parse_v5_software_version_from_metadata};
+
+    #[test]
+    fn the_header_carries_the_app_version_the_job_reports() {
+        assert_eq!(
+            parse_software_info_from_metadata(
+                r#"{"slicer":{"name":"DragonFruit","version":"0.1.15"}}"#
+            ),
+            "0.1.15"
+        );
+    }
+
+    #[test]
+    fn an_explicit_goo_software_version_still_wins() {
+        assert_eq!(
+            parse_software_info_from_metadata(
+                r#"{"goo":{"softwareVersion":"9.9.9"},"slicer":{"version":"0.1.15"}}"#
+            ),
+            "9.9.9"
+        );
+    }
+
+    #[test]
+    fn a_job_that_does_not_say_which_app_writes_no_version() {
+        // The engine's own version is what `ENGINE_VERSION` would give here, and it
+        // is not the app's.
+        assert_eq!(parse_software_info_from_metadata("{}"), "");
+        assert_eq!(parse_software_info_from_metadata("not json"), "");
+    }
+
+    #[test]
+    fn the_v5_header_keeps_the_version_the_jupiter_2_accepts() {
+        // The app's version must not leak into SatelLite's borrowed identity.
+        assert_eq!(
+            parse_v5_software_version_from_metadata(r#"{"slicer":{"version":"0.1.15"}}"#),
+            crate::ENGINE_VERSION
+        );
+        assert_eq!(
+            parse_v5_software_version_from_metadata(r#"{"goo":{"softwareVersion":"9.9.9"}}"#),
+            "9.9.9"
+        );
+    }
 }
