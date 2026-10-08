@@ -48,7 +48,13 @@ pub(super) fn build_goo_container_bytes_with_progress(
     on_progress: Option<&dyn Fn(u32, u32)>,
 ) -> Result<Vec<u8>, SlicerV3Error> {
     let timing = parse_timing_model_from_job(job);
-    let build = parse_goo_build_model_from_job(job);
+    let mut build = parse_goo_build_model_from_job(job);
+    if timing.tilting_vat {
+        // Say the layers are mirrored when the engine mirrored them, as Chitubox
+        // does for the Mars 5 Ultra.
+        build.mirror_x |= job.mirror_x;
+        build.mirror_y |= job.mirror_y;
+    }
     let software_version = parse_software_info_from_metadata(&job.metadata_json);
 
     let previews = build_goo_previews(job.export_thumbnail_png_base64.as_deref())?;
@@ -233,10 +239,14 @@ fn write_goo_layer(out: &mut Vec<u8>, layer: &GooPreparedLayer, timing: &GooTimi
         )
     };
 
+    // No pause either way; a tilting printer gets the layer's own Z here, as
+    // Chitubox writes it, rather than the build plate's floor.
+    let pause_position_z = if timing.tilting_vat { layer.position_z_mm } else { 0.0 };
+
     let def_start = out.len();
 
     push_u16_be(out, 0);                          // Pause
-    push_f32_be(out, 0.0);                         // PausePositionZ
+    push_f32_be(out, pause_position_z);            // PausePositionZ
     push_f32_be(out, layer.position_z_mm);         // PositionZ
     push_f32_be(out, exposure);                    // ExposureTime
     push_f32_be(out, light_off);                   // LightOffDelay

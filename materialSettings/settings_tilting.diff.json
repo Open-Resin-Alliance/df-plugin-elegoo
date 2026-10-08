@@ -12,6 +12,12 @@
             "liftSpeedMmMin",
             "retractSpeedMmMin"
         ]   
-    }
+    },
+    "fields": [
+        {
+            "key": "waitTimeBeforeCureSec",
+            "defaultValue": 3
+        }
+    ]
 
 }

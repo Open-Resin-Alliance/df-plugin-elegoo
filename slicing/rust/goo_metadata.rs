@@ -9,6 +9,10 @@ use super::goo_types::{
 
 const DEFAULT_MACHINE_Z_MM: f32 = 220.0;
 
+// Chitubox's rest before cure for the Mars 5 Ultra; see the tilting branch of
+// `parse_timing_model_from_metadata`.
+const TILTING_DEFAULT_WAIT_BEFORE_CURE_SEC: f32 = 3.0;
+
 // Identity strings the Jupiter 2 printer validates at load (spec §16);
 // anything else fails file verification on the printer.
 const GOO_V5_DEFAULT_SLICER_NAME: &str = "ELEGOO SatelLite";
@@ -165,6 +169,7 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
             light_pwm: 255,
             bottom_light_pwm: 255,
             delay_mode: 0,
+            tilting_vat: false,
         };
     };
 
@@ -260,6 +265,7 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         light_pwm: pwm_byte(light_pwm_pct),
         bottom_light_pwm: pwm_byte(bottom_light_pwm_pct),
         delay_mode: 1,
+        tilting_vat: is_tilting_mode,
     };
 
     let sanitize_non_negative = |value: f32| {
@@ -345,8 +351,42 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         timing.bottom_lift_speed_mm_min = 60.0;
         timing.retract_speed_mm_min = 150.0;
         timing.bottom_retract_speed_mm_min = 150.0;
-        timing.lift_distance_mm = read_f32("layerHeightMm");
-        timing.bottom_lift_distance_mm = read_f32("layerHeightMm");
+        // The vat tilts to peel, so Z only steps by one layer: up by the layer
+        // height and back down by the same. The retract used to keep the 6 mm it
+        // falls back to from the default lift distance, which outweighs the lift;
+        // a Mars 5 Ultra printed every layer of such a file without the plate ever
+        // rising. Chitubox writes lift == retract == layer height, with no second
+        // stage, and its files print.
+        let layer_height_mm = read_f32("layerHeightMm");
+        timing.lift_distance_mm = layer_height_mm;
+        timing.bottom_lift_distance_mm = layer_height_mm;
+        timing.retract_distance_mm = layer_height_mm;
+        timing.bottom_retract_distance_mm = layer_height_mm;
+        timing.lift_distance2_mm = 0.0;
+        timing.lift_speed2_mm_min = 0.0;
+        timing.retract_distance2_mm = 0.0;
+        timing.retract_speed2_mm_min = 0.0;
+        timing.bottom_lift_distance2_mm = 0.0;
+        timing.bottom_lift_speed2_mm_min = 0.0;
+        timing.bottom_retract_distance2_mm = 0.0;
+        timing.bottom_retract_speed2_mm_min = 0.0;
+
+        // Rest before curing while the vat settles after the tilt, as Chitubox
+        // does. A job that sets the wait (even to 0) keeps it; the tilting
+        // settings have no burn-in waits of their own, so those follow the
+        // normal ones unless a job sets them.
+        if read_f32_opt("waitTimeBeforeCureSec").is_none() {
+            timing.wait_time_before_cure_sec = TILTING_DEFAULT_WAIT_BEFORE_CURE_SEC;
+        }
+        if read_f32_opt("bottomWaitTimeBeforeCureSec").is_none() {
+            timing.bottom_wait_time_before_cure_sec = timing.wait_time_before_cure_sec;
+        }
+        if read_f32_opt("bottomWaitTimeAfterCureSec").is_none() {
+            timing.bottom_wait_time_after_cure_sec = timing.wait_time_after_cure_sec;
+        }
+        if read_f32_opt("bottomWaitTimeAfterLiftSec").is_none() {
+            timing.bottom_wait_time_after_lift_sec = timing.wait_time_after_lift_sec;
+        }
     }
 
     // GOO DelayMode: 0 = light-off delay, 1 = per-stage wait times.

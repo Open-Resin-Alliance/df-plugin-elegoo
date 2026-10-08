@@ -139,6 +139,8 @@ pub(super) struct GooTimingModel {
     pub bottom_light_pwm: u16,
     /// 0 = LightOff (use light_off_delay), 1 = WaitTime (use per-stage wait times).
     pub delay_mode: u8,
+    /// The printer peels by tilting its vat (`settingsMode` "tilting").
+    pub tilting_vat: bool,
 }
 
 #[derive(Debug, Clone)]

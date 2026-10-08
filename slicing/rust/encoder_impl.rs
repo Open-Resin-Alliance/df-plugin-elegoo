@@ -1210,12 +1210,100 @@ mod tests {
         }"#;
 
         let timing = parse_timing_model_from_metadata(meta);
+        assert!(timing.tilting_vat);
         assert!((timing.lift_speed_mm_min - 60.0).abs() < f32::EPSILON);
         assert!((timing.bottom_lift_speed_mm_min - 60.0).abs() < f32::EPSILON);
         assert!((timing.retract_speed_mm_min - 150.0).abs() < f32::EPSILON);
         assert!((timing.bottom_retract_speed_mm_min - 150.0).abs() < f32::EPSILON);
         assert!((timing.lift_distance_mm - 0.1).abs() < f32::EPSILON);
         assert!((timing.bottom_lift_distance_mm - 0.1).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn metadata_timing_tilting_mode_retracts_as_far_as_it_lifts() {
+        // The retract used to stay at the 6 mm it falls back to from the lift
+        // distance; against a one-layer lift that kept a Mars 5 Ultra's plate
+        // on the floor for the whole print.
+        let meta = r#"{
+            "printer": { "settingsMode": "tilting" },
+            "material": {
+                "layerHeightMm": 0.05,
+                "liftDistanceMm": 6.0,
+                "liftSpeedMmMin": 60.0,
+                "retractSpeedMmMin": 150.0
+            },
+            "goo": {
+                "liftDistance2Mm": 2.0,
+                "retractDistance2Mm": 3.0,
+                "bottomRetractDistance2Mm": 3.0
+            }
+        }"#;
+
+        let timing = parse_timing_model_from_metadata(meta);
+        assert!((timing.lift_distance_mm - 0.05).abs() < f32::EPSILON);
+        assert!((timing.retract_distance_mm - 0.05).abs() < f32::EPSILON);
+        assert!((timing.bottom_lift_distance_mm - 0.05).abs() < f32::EPSILON);
+        assert!((timing.bottom_retract_distance_mm - 0.05).abs() < f32::EPSILON);
+        assert_eq!(timing.lift_distance2_mm, 0.0);
+        assert_eq!(timing.retract_distance2_mm, 0.0);
+        assert_eq!(timing.bottom_lift_distance2_mm, 0.0);
+        assert_eq!(timing.bottom_retract_distance2_mm, 0.0);
+    }
+
+    #[test]
+    fn metadata_timing_tilting_mode_rests_before_cure_unless_told_otherwise() {
+        let unset = r#"{
+            "printer": { "settingsMode": "tilting" },
+            "material": { "layerHeightMm": 0.05 }
+        }"#;
+        let timing = parse_timing_model_from_metadata(unset);
+        assert!((timing.wait_time_before_cure_sec - 3.0).abs() < f32::EPSILON);
+        assert!((timing.bottom_wait_time_before_cure_sec - 3.0).abs() < f32::EPSILON);
+        assert_eq!(timing.delay_mode, 1);
+
+        let set = r#"{
+            "printer": { "settingsMode": "tilting" },
+            "material": { "layerHeightMm": 0.05 },
+            "goo": { "waitTimeBeforeCureSec": 1.5, "waitTimeAfterLiftSec": 0.5 }
+        }"#;
+        let timing = parse_timing_model_from_metadata(set);
+        assert!((timing.wait_time_before_cure_sec - 1.5).abs() < f32::EPSILON);
+        assert!((timing.bottom_wait_time_before_cure_sec - 1.5).abs() < f32::EPSILON);
+        assert!((timing.bottom_wait_time_after_lift_sec - 0.5).abs() < f32::EPSILON);
+
+        let zero = r#"{
+            "printer": { "settingsMode": "tilting" },
+            "material": { "layerHeightMm": 0.05 },
+            "goo": { "waitTimeBeforeCureSec": 0 }
+        }"#;
+        let timing = parse_timing_model_from_metadata(zero);
+        assert_eq!(timing.wait_time_before_cure_sec, 0.0);
+        assert_eq!(timing.bottom_wait_time_before_cure_sec, 0.0);
+        assert_eq!(timing.delay_mode, 0);
+    }
+
+    #[test]
+    fn metadata_timing_two_stage_mode_motion_and_waits_are_unchanged() {
+        let meta = r#"{
+            "printer": { "settingsMode": "twostage" },
+            "material": {
+                "layerHeightMm": 0.05,
+                "liftDistanceMm": 6.0,
+                "liftSpeedMmMin": 60.0,
+                "retractSpeedMmMin": 150.0
+            },
+            "goo": { "liftDistance2Mm": 2.0, "retractDistance2Mm": 3.0 }
+        }"#;
+
+        let timing = parse_timing_model_from_metadata(meta);
+        assert!(!timing.tilting_vat);
+        assert!((timing.lift_distance_mm - 6.0).abs() < f32::EPSILON);
+        assert!((timing.retract_distance_mm - 6.0).abs() < f32::EPSILON);
+        assert!((timing.bottom_retract_distance_mm - 6.0).abs() < f32::EPSILON);
+        assert!((timing.lift_distance2_mm - 2.0).abs() < f32::EPSILON);
+        assert!((timing.retract_distance2_mm - 3.0).abs() < f32::EPSILON);
+        assert_eq!(timing.wait_time_before_cure_sec, 0.0);
+        assert_eq!(timing.delay_mode, 0);
     }
 
     #[test]
@@ -1295,6 +1383,123 @@ mod tests {
             &bytes[def0 + GOO_LAYER_DEF_SIZE + data_len0..def0 + GOO_LAYER_DEF_SIZE + data_len0 + 2],
             &[0x0D, 0x0A]
         );
+    }
+
+    fn be_f32(bytes: &[u8], at: usize) -> f32 {
+        f32::from_be_bytes(bytes[at..at + 4].try_into().unwrap())
+    }
+
+    /// Mirror flags, per-layer flag and the normal/bottom motion and rest the
+    /// header carries, read at their offsets past the layer count.
+    struct HeaderMotion {
+        mirror_x: u8,
+        delay_mode: u8,
+        bottom_wait_before_cure: f32,
+        wait_before_cure: f32,
+        bottom_lift: f32,
+        lift: f32,
+        bottom_retract: f32,
+        retract: f32,
+    }
+
+    fn read_header_motion(bytes: &[u8]) -> HeaderMotion {
+        let at = GOO_LAYER_COUNT_OFFSET as usize;
+        HeaderMotion {
+            mirror_x: bytes[at + 8],
+            delay_mode: bytes[at + 30],
+            bottom_wait_before_cure: be_f32(bytes, at + 43),
+            wait_before_cure: be_f32(bytes, at + 55),
+            bottom_lift: be_f32(bytes, at + 67),
+            lift: be_f32(bytes, at + 75),
+            bottom_retract: be_f32(bytes, at + 83),
+            retract: be_f32(bytes, at + 91),
+        }
+    }
+
+    const MARS_5_ULTRA_GOO_METADATA: &str = r#"{
+        "printer": { "settingsMode": "tilting", "mirrorX": true },
+        "material": {
+            "layerHeightMm": 0.05,
+            "normalExposureSec": 2.0,
+            "bottomExposureSec": 40.0,
+            "bottomLayerCount": 1,
+            "liftDistanceMm": 6.0,
+            "liftSpeedMmMin": 60.0,
+            "retractSpeedMmMin": 150.0
+        },
+        "goo": { "waitTimeBeforeCureSec": 3.0 }
+    }"#;
+
+    #[test]
+    fn container_tilting_header_matches_chitubox_motion() {
+        let mut job = make_test_job();
+        job.mirror_x = true;
+        job.metadata_json = MARS_5_ULTRA_GOO_METADATA.to_string();
+        let prepared = make_prepared_layers(&job, 1);
+
+        let bytes = build_goo_container_bytes(&job, &prepared).expect("container should build");
+        let header = read_header_motion(&bytes);
+
+        assert_eq!(header.mirror_x, 1);
+        assert_eq!(header.delay_mode, 1);
+        assert!((header.wait_before_cure - 3.0).abs() < f32::EPSILON);
+        assert!((header.bottom_wait_before_cure - 3.0).abs() < f32::EPSILON);
+        for height in [header.lift, header.retract, header.bottom_lift, header.bottom_retract] {
+            assert!((height - 0.05).abs() < f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn container_tilting_layer_defs_step_one_layer_and_pause_at_their_own_z() {
+        let mut job = make_test_job();
+        job.mirror_x = true;
+        job.metadata_json = MARS_5_ULTRA_GOO_METADATA.to_string();
+        let prepared = make_prepared_layers(&job, 1);
+
+        let bytes = build_goo_container_bytes(&job, &prepared).expect("container should build");
+
+        let mut def = GOO_HEADER_SIZE as usize;
+        for layer in &prepared {
+            // PausePositionZ +2, PositionZ +6, WaitTimeBeforeCure +26,
+            // LiftHeight +30, RetractHeight +46.
+            assert!((be_f32(&bytes, def + 2) - layer.position_z_mm).abs() < f32::EPSILON);
+            assert!((be_f32(&bytes, def + 6) - layer.position_z_mm).abs() < f32::EPSILON);
+            assert!((be_f32(&bytes, def + 26) - 3.0).abs() < f32::EPSILON);
+            assert!((be_f32(&bytes, def + 30) - 0.05).abs() < f32::EPSILON);
+            assert!((be_f32(&bytes, def + 46) - 0.05).abs() < f32::EPSILON);
+            def += GOO_LAYER_DEF_SIZE + layer.encoded.len() + 2;
+        }
+    }
+
+    #[test]
+    fn container_non_tilting_header_and_layer_defs_are_unchanged() {
+        let mut job = make_test_job();
+        job.mirror_x = true;
+        job.metadata_json = r#"{
+            "printer": { "settingsMode": "twostage", "mirrorX": true },
+            "material": {
+                "layerHeightMm": 0.05,
+                "bottomLayerCount": 1,
+                "liftDistanceMm": 6.0,
+                "liftSpeedMmMin": 60.0,
+                "retractSpeedMmMin": 150.0
+            }
+        }"#
+        .to_string();
+        let prepared = make_prepared_layers(&job, 1);
+
+        let bytes = build_goo_container_bytes(&job, &prepared).expect("container should build");
+        let header = read_header_motion(&bytes);
+
+        assert_eq!(header.mirror_x, 0);
+        assert_eq!(header.delay_mode, 0);
+        assert_eq!(header.wait_before_cure, 0.0);
+        assert!((header.lift - 6.0).abs() < f32::EPSILON);
+        assert!((header.retract - 6.0).abs() < f32::EPSILON);
+
+        let def = GOO_HEADER_SIZE as usize;
+        assert_eq!(be_f32(&bytes, def + 2), 0.0);
+        assert!((be_f32(&bytes, def + 46) - 6.0).abs() < f32::EPSILON);
     }
 
     #[test]
