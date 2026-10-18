@@ -35,7 +35,7 @@
   },
   {
     "presetId": "elegoo-jupiter-se-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Jupiter",
     "name": "Jupiter SE",
@@ -59,13 +59,13 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-jupiter-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Jupiter",
     "name": "Jupiter",
@@ -89,7 +89,7 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5",
       "settingsMode": "twostage",
-      "mirrorX": true,
+      "mirrorX": false,
       "mirrorY": false
     }
   }

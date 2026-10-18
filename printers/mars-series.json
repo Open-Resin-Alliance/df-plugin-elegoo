@@ -1,7 +1,7 @@
 [
   {
     "presetId": "elegoo-mars-5-ultra-ctb",
-    "profileVersion": 3,
+    "profileVersion": 4,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 5 Ultra",
@@ -25,13 +25,13 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "tilting",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-mars-5-goo",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 5",
@@ -54,13 +54,13 @@
       "resolutionY": 2560,
       "outputFormat": ".goo",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-mars-4-ultra-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 4 Ultra",
@@ -84,8 +84,8 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
@@ -148,7 +148,7 @@
   },
   {
     "presetId": "elegoo-mars-4-goo",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 4",
@@ -171,13 +171,13 @@
       "resolutionY": 4320,
       "outputFormat": ".goo",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-mars-3-pro-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 3 Pro",
@@ -201,13 +201,13 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-mars-3-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Mars",
     "name": "Mars 3",
@@ -231,8 +231,8 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
