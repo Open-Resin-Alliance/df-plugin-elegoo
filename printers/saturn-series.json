@@ -1,7 +1,7 @@
 [
   {
     "presetId": "elegoo-saturn-4-ultra-16k-ctb",
-    "profileVersion": 4,
+    "profileVersion": 5,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4 Ultra 16K",
@@ -29,13 +29,13 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "tilting",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-saturn-4-ultra-ctb",
-    "profileVersion": 3,
+    "profileVersion": 4,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4 Ultra",
@@ -59,13 +59,13 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "tilting",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
     "presetId": "elegoo-saturn-4-goo",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4",
@@ -88,8 +88,8 @@
       "resolutionY": 5120,
       "outputFormat": ".goo",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
@@ -124,7 +124,7 @@
   },
   {
     "presetId": "elegoo-saturn-3-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 3",
@@ -148,8 +148,8 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   },
   {
@@ -184,7 +184,7 @@
   },
   {
     "presetId": "elegoo-saturn-2-ctb",
-    "profileVersion": 1,
+    "profileVersion": 2,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 2",
@@ -208,8 +208,8 @@
       "outputFormat": ".ctb",
       "formatVersion": "v5enc",
       "settingsMode": "twostage",
-      "mirrorX": true,
-      "mirrorY": false
+      "mirrorX": false,
+      "mirrorY": true
     }
   }
 ]
