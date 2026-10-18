@@ -347,6 +347,8 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         timing.bottom_retract_speed_mm_min = 150.0;
         timing.lift_distance_mm = read_f32("layerHeightMm");
         timing.bottom_lift_distance_mm = read_f32("layerHeightMm");
+        timing.bottom_retract_distance_mm = read_f32("layerHeightMm");
+        timing.retract_distance_mm = read_f32("layerHeightMm");
     }
 
     // GOO DelayMode: 0 = light-off delay, 1 = per-stage wait times.
