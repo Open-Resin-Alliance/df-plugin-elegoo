@@ -4,10 +4,11 @@
 // Reference: /root/GOO_v5_Format_Spec.md (header size 195,492 as validated
 // against real Satellite output; NOT UVtools PR #1129's 195,496).
 use crate::engine::SlicerV3Error;
+use crate::layer_settings::LayerSettingsSchedule;
 use crate::types::SliceJobV3;
 use md5::{Digest, Md5};
 
-use super::goo_encoder::compute_print_time_seconds;
+use super::goo_encoder::{compute_print_time_seconds, goo_stage_heights, validate_goo_layer_settings};
 use super::goo_layout::{push_crlf, push_str_fixed, push_u8};
 use super::goo_metadata::{
     parse_goo_build_model_from_job, parse_goo_v5_settings_from_job, parse_timing_model_from_job,
@@ -77,13 +78,14 @@ fn write_goo_v5_layer_def(
     layer_index: usize,
     layer_height_mm: f32,
     timing: &GooTimingModel,
+    schedule: &LayerSettingsSchedule,
 ) {
     let is_bottom = (layer_index as u32) < timing.bottom_layer_count;
     let (
-        exposure, light_off, w_after_cure, w_after_lift, w_before_cure,
-        lift_h, lift_s, lift_h2, lift_s2,
-        ret_h, ret_s, ret_h2, ret_s2,
-        pwm,
+        mut exposure, mut light_off, mut w_after_cure, mut w_after_lift, mut w_before_cure,
+        mut lift_h, mut lift_s, mut lift_h2, mut lift_s2,
+        mut ret_h, mut ret_s, mut ret_h2, mut ret_s2,
+        mut pwm,
     ) = if is_bottom {
         (
             timing.bottom_exposure_sec,
@@ -120,6 +122,21 @@ fn write_goo_v5_layer_def(
         )
     };
 
+    if let Some(patch) = schedule.patch_at(layer_index as u32) {
+        if let Some(value) = patch.exposure_sec { exposure = value as f32; }
+        if let Some(value) = patch.light_off_delay_sec { light_off = value as f32; }
+        if let Some(value) = patch.wait_time_after_cure_sec { w_after_cure = value as f32; }
+        if let Some(value) = patch.wait_time_after_lift_sec { w_after_lift = value as f32; }
+        if let Some(value) = patch.wait_time_before_cure_sec { w_before_cure = value as f32; }
+        (lift_h, lift_h2) = goo_stage_heights(lift_h, lift_h2, patch.lift_height_mm, patch.lift_height2_mm);
+        (ret_h, ret_h2) = goo_stage_heights(ret_h, ret_h2, patch.retract_height_mm, patch.retract_height2_mm);
+        if let Some(value) = patch.lift_speed_mm_min { lift_s = value as f32; }
+        if let Some(value) = patch.lift_speed2_mm_min { lift_s2 = value as f32; }
+        if let Some(value) = patch.retract_speed_mm_min { ret_s = value as f32; }
+        if let Some(value) = patch.retract_speed2_mm_min { ret_s2 = value as f32; }
+        if let Some(value) = patch.light_pwm { pwm = value as u16; }
+    }
+
     let def_start = out.len();
 
     push_u16_le(out, 0);                                        // Pause flag
@@ -147,13 +164,15 @@ fn write_goo_v5_layer_def(
 pub(super) fn build_goo_v5_container_bytes(
     job: &SliceJobV3,
     prepared: &[GooV5PreparedLayer],
+    schedule: &LayerSettingsSchedule,
 ) -> Result<Vec<u8>, SlicerV3Error> {
-    build_goo_v5_container_bytes_with_progress(job, prepared, None)
+    build_goo_v5_container_bytes_with_progress(job, prepared, schedule, None)
 }
 
 pub(super) fn build_goo_v5_container_bytes_with_progress(
     job: &SliceJobV3,
     prepared: &[GooV5PreparedLayer],
+    schedule: &LayerSettingsSchedule,
     on_progress: Option<&dyn Fn(u32, u32)>,
 ) -> Result<Vec<u8>, SlicerV3Error> {
     if prepared.is_empty() {
@@ -173,6 +192,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
     }
 
     let timing = parse_timing_model_from_job(job);
+    validate_goo_layer_settings(&timing, schedule)?;
     let build = parse_goo_build_model_from_job(job);
     let v5 = parse_goo_v5_settings_from_job(job);
     let software_version = parse_v5_software_version_from_metadata(&job.metadata_json);
@@ -305,7 +325,7 @@ pub(super) fn build_goo_v5_container_bytes_with_progress(
 
     // ── Layer definitions (§6) ────────────────────────────────────────────
     for layer in prepared {
-        write_goo_v5_layer_def(&mut out, layer.index, job.layer_height_mm, &timing);
+        write_goo_v5_layer_def(&mut out, layer.index, job.layer_height_mm, &timing, schedule);
     }
     assert_eq!(out.len() as u64, defs_base + l * GOO_V5_LAYER_DEF_SIZE as u64);
 

@@ -10,6 +10,7 @@ use crate::encoders::FormatEncoder;
 use crate::encoders::RawMaskStreamEncoder;
 use crate::encoders::RleStreamEncoder;
 use crate::engine::SlicerV3Error;
+use crate::layer_settings::{LayerSettingField, LayerSettingsSchedule};
 use crate::types::{LayerAreaStatsV3, RenderedLayersV3, SliceJobV3};
 use crossbeam_channel::bounded;
 use goo_layout::{
@@ -127,6 +128,7 @@ impl RawMaskStreamEncoder for GooRawMaskStreamingEncoder {
     }
 
     fn finalize_to_bytes(mut self: Box<Self>) -> Result<Vec<u8>, SlicerV3Error> {
+        let schedule = LayerSettingsSchedule::from_job(&self.job, &LayerSettingField::ALL)?;
         if self.consumed_layers == 0 {
             return Err(SlicerV3Error::MissingRenderedLayerPayload(
                 "no rendered layers were provided for Goo encoding".to_string(),
@@ -184,7 +186,7 @@ impl RawMaskStreamEncoder for GooRawMaskStreamingEncoder {
             prepared.push(layer);
         }
 
-        build_goo_container_bytes(&self.job, &prepared)
+        build_goo_container_bytes(&self.job, &prepared, &schedule)
     }
 }
 
@@ -230,13 +232,14 @@ impl RleStreamEncoder for GooRleStreamingEncoder {
     }
 
     fn finalize_to_bytes(mut self: Box<Self>) -> Result<Vec<u8>, SlicerV3Error> {
+        let schedule = LayerSettingsSchedule::from_job(&self.job, &LayerSettingField::ALL)?;
         if self.prepared.is_empty() {
             return Err(SlicerV3Error::MissingRenderedLayerPayload(
                 "no rendered layers were provided for Goo RLE encoding".to_string(),
             ));
         }
         self.prepared.sort_unstable_by_key(|p| p.index);
-        build_goo_container_bytes(&self.job, &self.prepared)
+        build_goo_container_bytes(&self.job, &self.prepared, &schedule)
     }
 
     fn parallel_encode_fn(
@@ -348,6 +351,7 @@ impl RleStreamEncoder for GooV5RleStreamingEncoder {
     }
 
     fn finalize_to_bytes(self: Box<Self>) -> Result<Vec<u8>, SlicerV3Error> {
+        let schedule = LayerSettingsSchedule::from_job(&self.job, &LayerSettingField::ALL)?;
         if self.encoded.is_empty() {
             return Err(SlicerV3Error::MissingRenderedLayerPayload(
                 "no rendered layers were provided for Goo V5 encoding".to_string(),
@@ -370,7 +374,7 @@ impl RleStreamEncoder for GooV5RleStreamingEncoder {
                 blocks: layer_blocks,
             });
         }
-        build_goo_v5_container_bytes(&job, &prepared)
+        build_goo_v5_container_bytes(&job, &prepared, &schedule)
     }
 
     fn rle_blocks(&self, _job: &SliceJobV3) -> Option<Vec<crate::rle::RleBlockSpec>> {
@@ -429,6 +433,7 @@ impl RleStreamEncoder for GooV5RleStreamingEncoder {
 fn encode_goo_v5_container_from_raw_masks(
     job: &SliceJobV3,
     raw_masks: &[Vec<u8>],
+    schedule: &LayerSettingsSchedule,
     on_progress: Option<&dyn Fn(u32, u32)>,
 ) -> Result<Vec<u8>, SlicerV3Error> {
     let settings = parse_goo_v5_settings_from_job(job);
@@ -465,7 +470,7 @@ fn encode_goo_v5_container_from_raw_masks(
         }
     }
 
-    let bytes = build_goo_v5_container_bytes_with_progress(job, &prepared, None)?;
+    let bytes = build_goo_v5_container_bytes_with_progress(job, &prepared, schedule, None)?;
     if let Some(progress) = on_progress {
         progress(total_progress, total_progress);
     }
@@ -481,6 +486,10 @@ pub fn create_plugin_encoder() -> Vec<Box<dyn FormatEncoder>> {
 impl FormatEncoder for GooPluginEncoder {
     fn output_format(&self) -> &'static str {
         ".goo"
+    }
+
+    fn supports_layer_settings(&self) -> bool {
+        true
     }
 
     fn requires_png_layers(&self) -> bool {
@@ -624,6 +633,7 @@ impl FormatEncoder for GooPluginEncoder {
         _layer_area_stats: &[LayerAreaStatsV3],
         on_progress: Option<&dyn Fn(u32, u32)>,
     ) -> Result<Vec<u8>, SlicerV3Error> {
+        let schedule = LayerSettingsSchedule::from_job(job, &LayerSettingField::ALL)?;
         let Some(raw_masks) = rendered_layers.raw_mask_layers.as_ref() else {
             return Err(SlicerV3Error::MissingRenderedLayerPayload(
                 "raw mask layers are required for Goo encoding".to_string(),
@@ -648,7 +658,7 @@ impl FormatEncoder for GooPluginEncoder {
         }
 
         if parse_goo_format_version_hint_from_job(job) == Some(GooFormatVersion::V51) {
-            return encode_goo_v5_container_from_raw_masks(job, raw_masks, on_progress);
+            return encode_goo_v5_container_from_raw_masks(job, raw_masks, &schedule, on_progress);
         }
 
         let timing = parse_timing_model_from_job(job);
@@ -699,6 +709,7 @@ impl FormatEncoder for GooPluginEncoder {
         let bytes = build_goo_container_bytes_with_progress(
             job,
             &prepared,
+            &schedule,
             layout_progress.as_ref().map(|cb| cb as &dyn Fn(u32, u32)),
         )?;
 
@@ -1070,6 +1081,11 @@ mod tests {
     };
     use super::{build_goo_container_bytes, decode_goo_rle, read_layer_preview_png};
     use crate::types::SliceJobV3;
+    use crate::layer_settings::{LayerSettingField, LayerSettingsSchedule};
+
+    fn layer_schedule(job: &SliceJobV3) -> LayerSettingsSchedule {
+        LayerSettingsSchedule::from_job(job, &LayerSettingField::ALL).expect("valid schedule")
+    }
 
     fn make_test_job() -> SliceJobV3 {
         SliceJobV3 {
@@ -1103,6 +1119,396 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+
+    use super::{GooPluginEncoder, SlicerV3Error};
+    use crate::encoders::FormatEncoder;
+    use crate::types::RenderedLayersV3;
+
+    fn ranges_job(version: &str, ranges: serde_json::Value) -> SliceJobV3 {
+        let mut job = make_test_job();
+        job.total_layers = 12;
+        job.format_version = Some(version.to_string());
+        job.metadata_json = serde_json::json!({
+            "material": {
+                "normalExposureSec": 2.0, "bottomExposureSec": 10.0,
+                "bottomLayerCount": 2, "transitionLayerCount": 2,
+                "liftDistanceMm": 0.1, "liftDistance2Mm": 5.3,
+                "bottomLiftDistanceMm": 0.3, "bottomLiftDistance2Mm": 1.7,
+                "retractDistanceMm": 0.2, "retractDistance2Mm": 3.3,
+                "bottomRetractDistanceMm": 0.4, "bottomRetractDistance2Mm": 1.6,
+                "liftSpeedMmMin": 60.0, "liftSpeed2MmMin": 90.0,
+                "retractSpeedMmMin": 150.0, "retractSpeed2MmMin": 180.0,
+                "lightOffDelaySec": 0.4, "waitTimeBeforeCureSec": 0.2,
+                "waitTimeAfterCureSec": 0.3, "waitTimeAfterLiftSec": 0.4
+            },
+            "layerSettingsRanges": ranges
+        }).to_string();
+        job
+    }
+
+    fn abc_ranges() -> serde_json::Value {
+        serde_json::json!([
+            {"id":"A", "startLayer":3, "endLayer":10, "settings":{
+                "exposureSec":4.0, "lightOffDelaySec":1.25,
+                "waitTimeBeforeCureSec":0.0, "waitTimeAfterCureSec":0.5,
+                "waitTimeAfterLiftSec":0.75, "liftHeightMm":8.0, "liftHeight2Mm":2.0,
+                "liftSpeedMmMin":120.0, "liftSpeed2MmMin":180.0,
+                "retractHeightMm":9.0, "retractHeight2Mm":3.0,
+                "retractSpeedMmMin":240.0, "retractSpeed2MmMin":300.0, "lightPwm":0
+            }},
+            {"id":"B", "startLayer":5, "endLayer":6, "settings":{"exposureSec":7.0}},
+            {"id":"C", "startLayer":6, "endLayer":7, "settings":{"exposureSec":9.0}}
+        ])
+    }
+
+    fn ranges_masks() -> Vec<Vec<u8>> {
+        (0..12).map(|layer| (0..16).map(|pixel| {
+            if (pixel + layer) % 3 == 0 { 255 } else { 0 }
+        }).collect()).collect()
+    }
+
+    fn mask_runs(mask: &[u8]) -> Vec<crate::rle::RleRun> {
+        let mut runs: Vec<crate::rle::RleRun> = Vec::new();
+        for &value in mask {
+            if let Some(last) = runs.last_mut() {
+                if last.value == value { last.length += 1; continue; }
+            }
+            runs.push(crate::rle::RleRun { length: 1, value });
+        }
+        runs
+    }
+
+    fn ranges_path(label: &str) -> std::path::PathBuf {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        std::env::temp_dir().join(format!("goo_layer_settings_ranges_{}_{}_{}.goo",
+            std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed), label))
+    }
+
+    // Return the common 64-byte settings record and every decoded physical mask.
+    fn decode_ranges_artifact(bytes: &[u8]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
+        let v5 = &bytes[..4] == GOO_V5_MAGIC;
+        let count = if v5 { u32_le(bytes, GOO_V5_PARAMS_OFFSET as usize) } else {
+            u32::from_be_bytes(bytes[GOO_LAYER_COUNT_OFFSET as usize..GOO_LAYER_COUNT_OFFSET as usize + 4].try_into().unwrap())
+        } as usize;
+        let mut records = Vec::new();
+        let mut masks = Vec::new();
+        if v5 {
+            let ldt = GOO_V5_LDT_START as usize;
+            let mut data = u32_le(bytes, ldt) as usize + count * 66;
+            for layer in 0..count {
+                let def = u32_le(bytes, ldt + layer * 8) as usize;
+                records.push(bytes[def..def + 64].to_vec());
+                let mut panels = Vec::new();
+                for block in 0..2 {
+                    let size = (u32_le(bytes, ldt + count * 8 + (layer * 2 + block) * 8 + 4) / 256) as usize;
+                    let panel = &bytes[data..data + size];
+                    panels.push(if bytes[GOO_V5_PREAMBLE_OFFSET as usize + 14] == 3 {
+                        decode_panel_binary(panel, 8).unwrap()
+                    } else { decode_panel_vuf(panel, 8, 255).unwrap() });
+                    data += size;
+                }
+                let mut mask = Vec::new();
+                for row in 0..4 {
+                    mask.extend_from_slice(&panels[0][row * 2..row * 2 + 2]);
+                    mask.extend_from_slice(&panels[1][row * 2..row * 2 + 2]);
+                }
+                masks.push(mask);
+            }
+        } else {
+            let mut def = GOO_HEADER_SIZE as usize;
+            for _ in 0..count {
+                records.push(bytes[def..def + 64].to_vec());
+                let size = u32::from_be_bytes(bytes[def + 66..def + 70].try_into().unwrap()) as usize;
+                masks.push(decode_goo_rle(&bytes[def + 70..def + 70 + size], 16).unwrap());
+                def += 70 + size + 2;
+            }
+        }
+        (records, masks)
+    }
+
+    fn record_float(record: &[u8], offset: usize, v5: bool) -> f32 {
+        let raw = record[offset..offset + 4].try_into().unwrap();
+        if v5 { f32::from_le_bytes(raw) } else { f32::from_be_bytes(raw) }
+    }
+
+    fn direct_ranges_artifact(job: &SliceJobV3, masks: &[Vec<u8>]) -> Result<Vec<u8>, SlicerV3Error> {
+        let schedule = layer_schedule(job);
+        if job.format_version.as_deref() == Some("v5.1") {
+            build_goo_v5_container_bytes(job, &make_v5_prepared(job, masks), &schedule)
+        } else {
+            let bottom = super::parse_timing_model_from_job(job).bottom_layer_count;
+            let prepared: Vec<_> = masks.iter().enumerate().map(|(index, mask)| {
+                encode_single_goo_layer_from_raw_mask(index, mask, false, 127, job.layer_height_mm, bottom)
+            }).collect();
+            build_goo_container_bytes(job, &prepared, &schedule)
+        }
+    }
+
+    fn streamed_ranges_artifact(
+        job: &SliceJobV3, masks: &[Vec<u8>], route: &str, path: Option<&std::path::Path>,
+    ) -> Result<Vec<u8>, SlicerV3Error> {
+        let encoder = GooPluginEncoder;
+        if route == "raw" {
+            let mut stream = encoder.create_raw_mask_stream_encoder(job)?.unwrap();
+            for index in (0..masks.len()).rev() {
+                stream.consume_raw_mask_layer(index as u32, masks[index].clone())?;
+            }
+            if let Some(path) = path {
+                stream.finalize_to_path(path)?;
+                return Ok(std::fs::read(path)?);
+            }
+            return stream.finalize_to_bytes();
+        }
+        let mut stream = encoder.create_rle_stream_encoder(job)?.unwrap();
+        let encode = stream.parallel_encode_fn();
+        let encode_block = stream.parallel_encode_block_fn();
+        for index in (0..masks.len()).rev() {
+            if route == "blocks" || route == "block-parallel" {
+                for block in (0..2).rev() {
+                    let panel: Vec<_> = masks[index].chunks_exact(4)
+                        .flat_map(|row| row[block * 2..block * 2 + 2].iter().copied()).collect();
+                    let runs = mask_runs(&panel);
+                    if route == "blocks" {
+                        stream.consume_rle_block(index as u32, block as u32, runs)?;
+                    } else {
+                        let bytes = encode_block.as_ref().unwrap()(index as u32, block as u32, &runs)?;
+                        stream.store_encoded_block(index as u32, block as u32, bytes);
+                    }
+                }
+            } else {
+                let runs = mask_runs(&masks[index]);
+                if route == "parallel" {
+                    let bytes = encode.as_ref().unwrap()(index as u32, &runs)?;
+                    stream.store_encoded_layer(index as u32, bytes);
+                } else { stream.consume_rle_layer(index as u32, runs)?; }
+            }
+        }
+        if let Some(path) = path {
+            stream.finalize_to_path(path)?;
+            Ok(std::fs::read(path)?)
+        } else { stream.finalize_to_bytes() }
+    }
+
+    fn assert_ranges_artifacts_equal(left: &[u8], right: &[u8]) {
+        assert_eq!(decode_ranges_artifact(left), decode_ranges_artifact(right));
+        // Header timestamps are generated at finalization; V5's digest includes them.
+        let end = if &left[..4] == GOO_V5_MAGIC { left.len() - 32 } else { left.len() };
+        assert_eq!(left.len(), right.len());
+        assert_eq!(&left[..68], &right[..68]);
+        assert_eq!(&left[92..end], &right[92..end]);
+    }
+
+
+    #[test]
+    fn goo_layer_settings_ranges_decoded_abc_all_outer_routes() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let job = ranges_job(version, abc_ranges());
+            let v5 = version == "v5.1";
+            let direct = direct_ranges_artifact(&job, &masks).unwrap();
+            let (records, decoded_masks) = decode_ranges_artifact(&direct);
+            assert_eq!(decoded_masks, masks, "{version} masks");
+            assert_eq!(direct[195_445], if v5 { 0 } else { 1 }, "activation flag");
+            let expected = [10.0,10.0,4.0,4.0,7.0,9.0,9.0,4.0,4.0,4.0,2.0,2.0];
+            for (index, record) in records.iter().enumerate() {
+                assert_eq!(record_float(record, 10, v5), expected[index], "{version} layer {}", index + 1);
+                if (2..10).contains(&index) {
+                    for (offset, value) in [(14,1.25),(18,0.5),(22,0.75),(26,0.0),
+                        (30,6.0),(34,120.0),(38,2.0),(42,180.0),
+                        (46,6.0),(50,240.0),(54,3.0),(58,300.0)] {
+                        assert_eq!(record_float(record, offset, v5), value, "{version} layer {} slot {offset}", index + 1);
+                    }
+                    assert_eq!(&record[62..64], &[0,0]);
+                }
+            }
+            let encoder = GooPluginEncoder;
+            assert!(encoder.supports_layer_settings());
+            let rendered = RenderedLayersV3 { raw_mask_layers: Some(masks.clone()), ..Default::default() };
+            let bytes = encoder.encode_container_from_rendered_layers(&job, &rendered, &[]).unwrap();
+            assert_ranges_artifacts_equal(&direct, &bytes);
+            let progress = std::cell::RefCell::new(Vec::new());
+            let with_progress = encoder.encode_container_from_rendered_layers_with_progress(
+                &job, &rendered, &[], Some(&|done,total| progress.borrow_mut().push((done,total))),
+            ).unwrap();
+            assert_ranges_artifacts_equal(&direct, &with_progress);
+            assert!(progress.borrow().last().is_some_and(|(done,total)| done == total));
+            let path = ranges_path(version);
+            encoder.encode_container_to_path(&job, &rendered, &[], &path).unwrap();
+            assert_ranges_artifacts_equal(&bytes, &std::fs::read(&path).unwrap());
+            encoder.encode_container_to_path_with_progress(&job, &rendered, &[], &path, None).unwrap();
+            assert_ranges_artifacts_equal(&bytes, &std::fs::read(&path).unwrap());
+            let routes: &[&str] = if v5 { &["rle","blocks","block-parallel"] } else { &["rle","parallel","raw"] };
+            for route in routes {
+                let bytes = streamed_ranges_artifact(&job, &masks, route, None).unwrap();
+                assert_ranges_artifacts_equal(&direct, &bytes);
+                let path_bytes = streamed_ranges_artifact(&job, &masks, route, Some(&path)).unwrap();
+                assert_ranges_artifacts_equal(&bytes, &path_bytes);
+            }
+            std::fs::remove_file(path).unwrap();
+
+            // Later equal-span C wins layer 6; removing it restores B, not the baseline.
+            let mut ranges = abc_ranges();
+            ranges.as_array_mut().unwrap().pop();
+            let without_c = direct_ranges_artifact(&ranges_job(version, ranges), &masks).unwrap();
+            let (without_c, _) = decode_ranges_artifact(&without_c);
+            assert_eq!(record_float(&without_c[5], 10, v5), 7.0);
+            assert_eq!(record_float(&without_c[6], 10, v5), 4.0);
+            assert_eq!(record_float(&without_c[5], 30, v5), 6.0);
+        }
+    }
+
+    #[test]
+    fn goo_layer_settings_ranges_preserve_baselines_transitions_and_beyond_eof_flags() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let v5 = version == "v5.1";
+            let empty_job = ranges_job(version, serde_json::json!([]));
+            let empty = direct_ranges_artifact(&empty_job, &masks).unwrap();
+            let mut absent_job = empty_job.clone();
+            let mut meta: serde_json::Value = serde_json::from_str(&absent_job.metadata_json).unwrap();
+            meta.as_object_mut().unwrap().remove("layerSettingsRanges");
+            absent_job.metadata_json = meta.to_string();
+            assert_ranges_artifacts_equal(&empty, &direct_ranges_artifact(&absent_job, &masks).unwrap());
+            let beyond = ranges_job(version, serde_json::json!([
+                {"id":"later", "startLayer":13,"endLayer":4294967295u32,"settings":{"exposureSec":99.0}}
+            ]));
+            assert!(!layer_schedule(&beyond).is_empty());
+            let beyond = direct_ranges_artifact(&beyond, &masks).unwrap();
+            assert_eq!(beyond[195_445], if v5 { 0 } else { 1 });
+            assert_ranges_artifacts_equal(&empty, &beyond);
+            let (baseline, baseline_masks) = decode_ranges_artifact(&empty);
+            assert_eq!(baseline_masks, masks);
+            assert_eq!(record_float(&baseline[2], 10, v5), if v5 { 2.0 } else { 6.0 });
+            assert_eq!(record_float(&baseline[3], 10, v5), 2.0);
+            let exposure_only = ranges_job(version, serde_json::json!([
+                {"id":"one", "startLayer":4,"endLayer":4,"settings":{"exposureSec":0.0}}
+            ]));
+            let (changed, changed_masks) = decode_ranges_artifact(&direct_ranges_artifact(&exposure_only, &masks).unwrap());
+            assert_eq!(changed_masks, masks);
+            for index in 0..12 {
+                if index == 3 {
+                    assert_eq!(record_float(&changed[index], 10, v5), 0.0);
+                    assert_eq!(&changed[index][14..], &baseline[index][14..]);
+                } else { assert_eq!(changed[index], baseline[index]); }
+            }
+            // These deliberately awkward f32 pairs must survive exposure-only patches bit-for-bit.
+            assert_eq!(record_float(&changed[3], 30, v5).to_bits(), 0.1f32.to_bits());
+            assert_eq!(record_float(&changed[3], 38, v5).to_bits(), 5.3f32.to_bits());
+            assert_eq!(record_float(&changed[3], 46, v5).to_bits(), 0.2f32.to_bits());
+            assert_eq!(record_float(&changed[3], 54, v5).to_bits(), 3.3f32.to_bits());
+        }
+    }
+
+    #[test]
+    fn goo_layer_settings_ranges_total_stage2_and_f64_emission() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let job = ranges_job(version, serde_json::json!([
+                {"id":"total", "startLayer":3,"endLayer":3,"settings":{"liftHeightMm":8.0,"retractHeightMm":9.0}},
+                {"id":"stage2", "startLayer":4,"endLayer":4,"settings":{"liftHeight2Mm":1.0,"retractHeight2Mm":1.0}},
+                {"id":"precision", "startLayer":5,"endLayer":5,"settings":{
+                    "liftHeightMm":16777217.0,"liftHeight2Mm":16777216.0,
+                    "retractHeightMm":16777217.0,"retractHeight2Mm":16777216.0}}
+            ]));
+            let (records, _) = decode_ranges_artifact(&direct_ranges_artifact(&job, &masks).unwrap());
+            let v5 = version == "v5.1";
+            assert_eq!(record_float(&records[2],30,v5), (8.0 - 5.3f32 as f64) as f32);
+            assert_eq!(record_float(&records[2],46,v5), (9.0 - 3.3f32 as f64) as f32);
+            assert_eq!(record_float(&records[3],30,v5), (0.1f32 as f64 + 5.3f32 as f64 - 1.0) as f32);
+            assert_eq!(record_float(&records[3],46,v5), (0.2f32 as f64 + 3.3f32 as f64 - 1.0) as f32);
+            assert_eq!(record_float(&records[4],30,v5), 1.0);
+            assert_eq!(record_float(&records[4],46,v5), 1.0);
+        }
+    }
+
+    #[test]
+    fn goo_layer_settings_ranges_invalid_destinations_and_bottom_boundary() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let v5 = version == "v5.1";
+            let mut invalid_jobs = Vec::new();
+            for field in ["liftHeight2Mm", "retractHeight2Mm"] {
+                let mut patch = serde_json::Map::new();
+                patch.insert(field.to_string(), serde_json::json!(3.0));
+                let mut job = ranges_job(version, serde_json::json!([
+                    {"id":"boundary", "startLayer":1,"endLayer":4,"settings":patch}
+                ]));
+                let mut meta: serde_json::Value = serde_json::from_str(&job.metadata_json).unwrap();
+                for key in ["bottomLiftDistanceMm","bottomRetractDistanceMm"] { meta["material"][key] = serde_json::json!(10.0); }
+                for key in ["liftDistanceMm","retractDistanceMm"] { meta["material"][key] = serde_json::json!(0.1); }
+                for key in ["liftDistance2Mm","retractDistance2Mm"] { meta["material"][key] = serde_json::json!(0.2); }
+                job.metadata_json = meta.to_string();
+                let err = direct_ranges_artifact(&job, &masks).unwrap_err();
+                assert!(matches!(&err, SlicerV3Error::InvalidLayerSettingsRanges(reason) if reason.contains("layer 3")), "{err}");
+                invalid_jobs.push(job);
+            }
+            invalid_jobs.push(ranges_job(version, serde_json::json!([
+                {"id":"precise", "startLayer":1,"endLayer":1,"settings":{"liftHeightMm":8.0,"liftHeight2Mm":8.000000000000002}}
+            ])));
+            for ranges in [
+                serde_json::json!(null),
+                serde_json::json!([{"id":"bad", "startLayer":13,"endLayer":20,"settings":{"exposureSec":null}}]),
+                serde_json::json!([{"id":"bad", "startLayer":13,"endLayer":20,"settings":{"unknown":1}}]),
+                serde_json::json!([{"id":"bad", "startLayer":2,"endLayer":1,"settings":{"exposureSec":1}}]),
+            ] { invalid_jobs.push(ranges_job(version, ranges)); }
+            let mut malformed = ranges_job(version, serde_json::json!([]));
+            malformed.metadata_json = "{".to_string();
+            invalid_jobs.push(malformed);
+            let encoder = GooPluginEncoder;
+            let rendered = RenderedLayersV3 { raw_mask_layers: Some(masks.clone()), ..Default::default() };
+            let path = ranges_path("invalid");
+            for job in invalid_jobs {
+                let routes: &[&str] = if v5 { &["rle","blocks","block-parallel"] } else { &["rle","parallel","raw"] };
+                for existing in [false,true] {
+                    if existing { std::fs::write(&path, b"keep destination").unwrap(); }
+                    assert!(encoder.encode_container_to_path(&job, &rendered, &[], &path).is_err());
+                    assert!(encoder.encode_container_to_path_with_progress(&job, &rendered, &[], &path, None).is_err());
+                    for route in routes {
+                        assert!(streamed_ranges_artifact(&job, &masks, route, Some(&path)).is_err(), "{version} {route}");
+                    }
+                    if existing {
+                        assert_eq!(std::fs::read(&path).unwrap(), b"keep destination");
+                        std::fs::remove_file(&path).unwrap();
+                    } else { assert!(!path.exists()); }
+                }
+            }
+        }
+    }
+
+
+    #[test]
+    fn goo_layer_settings_ranges_edges_touching_original_spans_and_binary_panels() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let mut job = ranges_job(version, serde_json::json!([
+                {"id":"wide", "startLayer":1,"endLayer":100,"settings":{"exposureSec":4.0,"liftHeightMm":8.0}},
+                {"id":"narrow", "startLayer":1,"endLayer":12,"settings":{"exposureSec":5.0}},
+                {"id":"touch-left", "startLayer":2,"endLayer":3,"settings":{"exposureSec":7.0}},
+                {"id":"touch-right", "startLayer":4,"endLayer":5,"settings":{"exposureSec":8.0}},
+                {"id":"first", "startLayer":1,"endLayer":1,"settings":{"exposureSec":0.0}},
+                {"id":"last", "startLayer":12,"endLayer":12,"settings":{"exposureSec":12.0}}
+            ]));
+            // V5's alternate binary compression shares exactly the same record schedule.
+            if version == "v5.1" {
+                let mut meta: serde_json::Value = serde_json::from_str(&job.metadata_json).unwrap();
+                meta["goo"] = serde_json::json!({"v5RleMode":"binary"});
+                job.metadata_json = meta.to_string();
+            }
+            let bytes = direct_ranges_artifact(&job, &masks).unwrap();
+            let (records, decoded) = decode_ranges_artifact(&bytes);
+            assert_eq!(decoded, masks);
+            let expected = [0.0,7.0,7.0,8.0,8.0,5.0,5.0,5.0,5.0,5.0,5.0,12.0];
+            for (index, record) in records.iter().enumerate() {
+                assert_eq!(record_float(record,10,version == "v5.1"),expected[index]);
+                let first = record_float(record,30,version == "v5.1");
+                let second = record_float(record,38,version == "v5.1");
+                assert!(((first as f64 + second as f64) - 8.0).abs() < 1e-6);
+            }
+            let stream = streamed_ranges_artifact(&job, &masks, "rle", None).unwrap();
+            assert_ranges_artifacts_equal(&bytes, &stream);
+        }
     }
 
     #[test]
@@ -1237,7 +1643,7 @@ mod tests {
         let job = make_test_job();
         let prepared = make_prepared_layers(&job, 1);
 
-        let bytes = build_goo_container_bytes(&job, &prepared).expect("container should build");
+        let bytes = build_goo_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container should build");
 
         assert_eq!(&bytes[0..4], GOO_FILE_VERSION);
         assert_eq!(&bytes[4..12], &GOO_FILE_MAGIC);
@@ -1273,7 +1679,7 @@ mod tests {
         let prepared = make_prepared_layers(&job, 1);
         let layer0_len = prepared[0].encoded.len();
 
-        let bytes = build_goo_container_bytes(&job, &prepared).expect("container should build");
+        let bytes = build_goo_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container should build");
 
         // ExposureTime sits at layer def offset +10 (Pause 2 + PausePositionZ 4 + PositionZ 4).
         let def0 = GOO_HEADER_SIZE as usize;
@@ -1404,7 +1810,7 @@ mod tests {
             mask1[row * 4 + 2] = 255;
         }
         let prepared = make_v5_prepared(&job, &[mask0.clone(), mask1.clone()]);
-        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+        let bytes = build_goo_v5_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container");
 
         // Optional dump for external reference-decoder validation.
         if let Ok(path) = std::env::var("GOO_V5_TEST_DUMP") {
@@ -1526,7 +1932,7 @@ mod tests {
         mask[5] = 255;
         mask[6] = 255;
         let prepared = make_v5_prepared(&job, &[mask]);
-        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+        let bytes = build_goo_v5_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container");
 
         // PixelBitWidth defaults to 3 on the binary path.
         assert_eq!(bytes[GOO_V5_PREAMBLE_OFFSET as usize + 14], 3);
@@ -1604,7 +2010,7 @@ mod tests {
             mask1[row * 4 + 2] = 255;
         }
         let prepared = make_v5_prepared(&job, &[mask0.clone(), mask1.clone()]);
-        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+        let bytes = build_goo_v5_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container");
 
         let dir = std::env::temp_dir();
         let path = dir.join("goo_v5_preview_test_vuf.goo");
@@ -1646,7 +2052,7 @@ mod tests {
         mask[5] = 255;
         mask[6] = 255;
         let prepared = make_v5_prepared(&job, &[mask.clone()]);
-        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+        let bytes = build_goo_v5_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container");
 
         let dir = std::env::temp_dir();
         let path = dir.join("goo_v5_preview_test_binary.goo");
@@ -1675,7 +2081,7 @@ mod tests {
         // ── V1.2 ──────────────────────────────────────────────────────
         let job_v12 = make_test_job();
         let prepared_v12 = make_prepared_layers(&job_v12, 1);
-        let bytes_v12 = build_goo_container_bytes(&job_v12, &prepared_v12).expect("v12");
+        let bytes_v12 = build_goo_container_bytes(&job_v12, &prepared_v12, &layer_schedule(&job_v12)).expect("v12");
         let path_v12 = dir.join("goo_preview_dispatch_v12.goo");
         std::fs::write(&path_v12, &bytes_v12).expect("write v12");
 
@@ -1687,7 +2093,7 @@ mod tests {
         // ── V5.1 ──────────────────────────────────────────────────────
         let job_v51 = make_v5_test_job();
         let prepared_v51 = make_v5_prepared(&job_v51, &[mask.clone()]);
-        let bytes_v51 = build_goo_v5_container_bytes(&job_v51, &prepared_v51).expect("v51");
+        let bytes_v51 = build_goo_v5_container_bytes(&job_v51, &prepared_v51, &layer_schedule(&job_v51)).expect("v51");
         let path_v51 = dir.join("goo_preview_dispatch_v51.goo");
         std::fs::write(&path_v51, &bytes_v51).expect("write v51");
 
@@ -1708,7 +2114,7 @@ mod tests {
         let job = make_v5_test_job();
         let mask = vec![0u8; 16];
         let prepared = make_v5_prepared(&job, &[mask]);
-        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+        let bytes = build_goo_v5_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container");
 
         let dir = std::env::temp_dir();
         let path = dir.join("goo_v5_preview_errors.goo");
@@ -1733,7 +2139,7 @@ mod tests {
         let job = make_v5_test_job();
         let mask = vec![0u8; 16];
         let prepared = make_v5_prepared(&job, &[mask.clone()]);
-        let bytes = build_goo_v5_container_bytes(&job, &prepared).expect("container");
+        let bytes = build_goo_v5_container_bytes(&job, &prepared, &layer_schedule(&job)).expect("container");
 
         let dir = std::env::temp_dir();
         let path = dir.join("goo_v5_preview_empty.goo");

@@ -2,6 +2,7 @@
 // layer preparation, and the top-level dispatcher.
 
 use crate::engine::SlicerV3Error;
+use crate::layer_settings::LayerSettingsSchedule;
 use crate::types::SliceJobV3;
 
 use super::goo_types::{GooPreparedLayer, GOO_CRLF, GOO_LAYER_MAGIC};
@@ -235,16 +236,18 @@ pub(super) fn prepare_layers_for_goo_with_progress(
 pub(super) fn build_goo_container_bytes(
     job: &SliceJobV3,
     prepared: &[GooPreparedLayer],
+    schedule: &LayerSettingsSchedule,
 ) -> Result<Vec<u8>, SlicerV3Error> {
-    build_goo_container_bytes_with_progress(job, prepared, None)
+    build_goo_container_bytes_with_progress(job, prepared, schedule, None)
 }
 
 pub(super) fn build_goo_container_bytes_with_progress(
     job: &SliceJobV3,
     prepared: &[GooPreparedLayer],
+    schedule: &LayerSettingsSchedule,
     on_progress: Option<&dyn Fn(u32, u32)>,
 ) -> Result<Vec<u8>, SlicerV3Error> {
-    build_goo_v12_with_progress(job, prepared, on_progress)
+    build_goo_v12_with_progress(job, prepared, schedule, on_progress)
 }
 
 #[cfg(test)]

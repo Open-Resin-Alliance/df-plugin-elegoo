@@ -1,3 +1,4 @@
+import { LAYER_SETTING_FIELDS } from '@/features/slicing/layerSettingsRanges';
 import type { SlicingFormatDefinition } from '@/features/slicing/formats/types';
 
 export const GOO_FORMAT_DEFINITION: SlicingFormatDefinition = {
@@ -7,6 +8,7 @@ export const GOO_FORMAT_DEFINITION: SlicingFormatDefinition = {
   ownership: 'plugin',
   layerDataKind: 'raw-mask',
   pluginId: 'elegoo',
+  layerSettingsFields: LAYER_SETTING_FIELDS,
   formatVersions: [
     { value: 'v1.2', label: 'GOO V1.2', isDefault: true },
     { value: 'v5.1', label: 'GOO V5.1 (Jupiter 2)' }

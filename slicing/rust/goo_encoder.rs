@@ -2,6 +2,7 @@
 // per-layer records with CRLF delimiters, and an 11-byte footer.
 // Reference: UVtools GooFile (https://github.com/sn4k3/UVtools).
 use crate::engine::SlicerV3Error;
+use crate::layer_settings::{LayerPrintSettingsPatch, LayerSettingsSchedule};
 use crate::types::SliceJobV3;
 
 use super::goo_layout::{
@@ -42,12 +43,72 @@ pub(super) fn compute_print_time_seconds(total_layers: usize, timing: &GooTiming
     total.round().max(0.0) as u32
 }
 
+/// Preserve untouched legacy f32 stage pairs; explicit heights use total travel.
+pub(super) fn goo_stage_heights(
+    first: f32,
+    second: f32,
+    total: Option<f64>,
+    stage2: Option<f64>,
+) -> (f32, f32) {
+    if total.is_none() && stage2.is_none() {
+        return (first, second);
+    }
+    let total = total.unwrap_or(first as f64 + second as f64);
+    let stage2 = stage2.unwrap_or(second as f64);
+    ((total - stage2) as f32, stage2 as f32)
+}
+
+pub(super) fn validate_goo_layer_settings(
+    timing: &GooTimingModel,
+    schedule: &LayerSettingsSchedule,
+) -> Result<(), SlicerV3Error> {
+    for segment in schedule.segments() {
+        validate_goo_patch_heights(timing, &segment.settings, segment.start_layer)?;
+        // Motion changes only at the bottom/nonbottom boundary, not transitions.
+        if timing.bottom_layer_count >= segment.start_layer
+            && timing.bottom_layer_count < segment.end_layer
+        {
+            validate_goo_patch_heights(timing, &segment.settings, timing.bottom_layer_count + 1)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_goo_patch_heights(
+    timing: &GooTimingModel,
+    patch: &LayerPrintSettingsPatch,
+    layer_number: u32,
+) -> Result<(), SlicerV3Error> {
+    let (lift1, lift2, retract1, retract2) = if layer_number <= timing.bottom_layer_count {
+        (timing.bottom_lift_distance_mm, timing.bottom_lift_distance2_mm,
+         timing.bottom_retract_distance_mm, timing.bottom_retract_distance2_mm)
+    } else {
+        (timing.lift_distance_mm, timing.lift_distance2_mm,
+         timing.retract_distance_mm, timing.retract_distance2_mm)
+    };
+    for (name, first, second, total, stage2) in [
+        ("lift", lift1, lift2, patch.lift_height_mm, patch.lift_height2_mm),
+        ("retract", retract1, retract2, patch.retract_height_mm, patch.retract_height2_mm),
+    ] {
+        if (total.is_some() || stage2.is_some())
+            && stage2.unwrap_or(second as f64) > total.unwrap_or(first as f64 + second as f64)
+        {
+            return Err(SlicerV3Error::InvalidLayerSettingsRanges(format!(
+                "layer {layer_number}: {name} stage-2 height exceeds total height"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn build_goo_container_bytes_with_progress(
     job: &SliceJobV3,
     prepared: &[GooPreparedLayer],
+    schedule: &LayerSettingsSchedule,
     on_progress: Option<&dyn Fn(u32, u32)>,
 ) -> Result<Vec<u8>, SlicerV3Error> {
     let timing = parse_timing_model_from_job(job);
+    validate_goo_layer_settings(&timing, schedule)?;
     let build = parse_goo_build_model_from_job(job);
     let software_version = parse_software_info_from_metadata(&job.metadata_json);
 
@@ -76,7 +137,7 @@ pub(super) fn build_goo_container_bytes_with_progress(
 
     let total_prepared = prepared.len() as u32;
     for (idx, layer) in prepared.iter().enumerate() {
-        write_goo_layer(&mut out, layer, &timing);
+        write_goo_layer(&mut out, layer, &timing, schedule);
         if let Some(progress) = on_progress {
             progress((idx as u32) + 1, total_prepared.max(1));
         }
@@ -189,12 +250,17 @@ fn interpolate_transition_layer_exposure(
             * (layer.index as u32 - timing.bottom_layer_count + 1) as f32;
 }
 
-fn write_goo_layer(out: &mut Vec<u8>, layer: &GooPreparedLayer, timing: &GooTimingModel) {
+fn write_goo_layer(
+    out: &mut Vec<u8>,
+    layer: &GooPreparedLayer,
+    timing: &GooTimingModel,
+    schedule: &LayerSettingsSchedule,
+) {
     let (
-        exposure, light_off, w_after_cure, w_after_lift, w_before_cure,
-        lift_h, lift_s, lift_h2, lift_s2,
-        ret_h, ret_s, ret_h2, ret_s2,
-        pwm,
+        mut exposure, mut light_off, mut w_after_cure, mut w_after_lift, mut w_before_cure,
+        mut lift_h, mut lift_s, mut lift_h2, mut lift_s2,
+        mut ret_h, mut ret_s, mut ret_h2, mut ret_s2,
+        mut pwm,
     ) = if layer.is_bottom {
         (
             timing.bottom_exposure_sec,
@@ -232,6 +298,21 @@ fn write_goo_layer(out: &mut Vec<u8>, layer: &GooPreparedLayer, timing: &GooTimi
             timing.light_pwm,
         )
     };
+
+    if let Some(patch) = schedule.patch_at(layer.index as u32) {
+        if let Some(value) = patch.exposure_sec { exposure = value as f32; }
+        if let Some(value) = patch.light_off_delay_sec { light_off = value as f32; }
+        if let Some(value) = patch.wait_time_after_cure_sec { w_after_cure = value as f32; }
+        if let Some(value) = patch.wait_time_after_lift_sec { w_after_lift = value as f32; }
+        if let Some(value) = patch.wait_time_before_cure_sec { w_before_cure = value as f32; }
+        (lift_h, lift_h2) = goo_stage_heights(lift_h, lift_h2, patch.lift_height_mm, patch.lift_height2_mm);
+        (ret_h, ret_h2) = goo_stage_heights(ret_h, ret_h2, patch.retract_height_mm, patch.retract_height2_mm);
+        if let Some(value) = patch.lift_speed_mm_min { lift_s = value as f32; }
+        if let Some(value) = patch.lift_speed2_mm_min { lift_s2 = value as f32; }
+        if let Some(value) = patch.retract_speed_mm_min { ret_s = value as f32; }
+        if let Some(value) = patch.retract_speed2_mm_min { ret_s2 = value as f32; }
+        if let Some(value) = patch.light_pwm { pwm = value as u16; }
+    }
 
     let def_start = out.len();
 
