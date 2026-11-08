@@ -1301,11 +1301,10 @@ mod tests {
     }
 
 
-    #[test]
-    fn goo_layer_settings_ranges_decoded_abc_all_outer_routes() {
+    fn assert_abc_ranges_all_outer_routes(ranges: serde_json::Value) {
         let masks = ranges_masks();
         for version in ["v1.2", "v5.1"] {
-            let job = ranges_job(version, abc_ranges());
+            let job = ranges_job(version, ranges.clone());
             let v5 = version == "v5.1";
             let direct = direct_ranges_artifact(&job, &masks).unwrap();
             let (records, decoded_masks) = decode_ranges_artifact(&direct);
@@ -1349,7 +1348,7 @@ mod tests {
             std::fs::remove_file(path).unwrap();
 
             // Later equal-span C wins layer 6; removing it restores B, not the baseline.
-            let mut ranges = abc_ranges();
+            let mut ranges = ranges.clone();
             ranges.as_array_mut().unwrap().pop();
             let without_c = direct_ranges_artifact(&ranges_job(version, ranges), &masks).unwrap();
             let (without_c, _) = decode_ranges_artifact(&without_c);
@@ -1357,6 +1356,27 @@ mod tests {
             assert_eq!(record_float(&without_c[6], 10, v5), 4.0);
             assert_eq!(record_float(&without_c[5], 30, v5), 6.0);
         }
+    }
+
+    #[test]
+    fn goo_layer_settings_ranges_decoded_abc_all_outer_routes() {
+        assert_abc_ranges_all_outer_routes(abc_ranges());
+    }
+
+    #[test]
+    fn goo_layer_settings_ranges_mm_decoded_abc_all_outer_routes() {
+        let mut ranges = abc_ranges();
+        for (range, (start, end)) in ranges.as_array_mut().unwrap().iter_mut()
+            .zip([(0.15, 0.5), (0.25, 0.3), (0.3, 0.35)])
+        {
+            let object = range.as_object_mut().unwrap();
+            object.remove("startLayer");
+            object.remove("endLayer");
+            object.insert("unit".into(), serde_json::json!("mm"));
+            object.insert("startMm".into(), serde_json::json!(start));
+            object.insert("endMm".into(), serde_json::json!(end));
+        }
+        assert_abc_ranges_all_outer_routes(ranges);
     }
 
     #[test]
@@ -1398,6 +1418,22 @@ mod tests {
             assert_eq!(record_float(&changed[3], 38, v5).to_bits(), 5.3f32.to_bits());
             assert_eq!(record_float(&changed[3], 46, v5).to_bits(), 0.2f32.to_bits());
             assert_eq!(record_float(&changed[3], 54, v5).to_bits(), 3.3f32.to_bits());
+        }
+    }
+
+    #[test]
+    fn goo_layer_settings_ranges_mm_empty_grid_preserves_activation_and_records() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let baseline = direct_ranges_artifact(&ranges_job(version, serde_json::json!([])), &masks).unwrap();
+            for (start, end) in [(0.0, 0.0), (0.301, 0.349), (20.0, 30.0)] {
+                let job = ranges_job(version, serde_json::json!([
+                    {"id":"none", "unit":"mm", "startMm":start,"endMm":end,"settings":{"exposureSec":99}}
+                ]));
+                let bytes = streamed_ranges_artifact(&job, &masks, "rle", None).unwrap();
+                assert_eq!(bytes[195_445], if version == "v5.1" { 0 } else { 1 });
+                assert_ranges_artifacts_equal(&baseline, &bytes);
+            }
         }
     }
 
@@ -1452,6 +1488,9 @@ mod tests {
                 serde_json::json!([{"id":"bad", "startLayer":13,"endLayer":20,"settings":{"exposureSec":null}}]),
                 serde_json::json!([{"id":"bad", "startLayer":13,"endLayer":20,"settings":{"unknown":1}}]),
                 serde_json::json!([{"id":"bad", "startLayer":2,"endLayer":1,"settings":{"exposureSec":1}}]),
+                serde_json::json!([{"id":"mixed", "unit":"mm", "startMm":0.0,"endMm":0.3,"startLayer":1,"settings":{"exposureSec":1}}]),
+                serde_json::json!([{"id":"inverted", "unit":"mm", "startMm":0.3,"endMm":0.1,"settings":{"exposureSec":1}}]),
+                serde_json::json!([{"id":"motion", "unit":"mm", "startMm":0.05,"endMm":0.6,"settings":{"liftHeightMm":1,"liftHeight2Mm":2}}]),
             ] { invalid_jobs.push(ranges_job(version, ranges)); }
             let mut malformed = ranges_job(version, serde_json::json!([]));
             malformed.metadata_json = "{".to_string();
