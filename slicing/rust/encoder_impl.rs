@@ -1387,7 +1387,7 @@ mod tests {
             let baseline = decode_ranges_artifact(&direct_ranges_artifact(
                 &ranges_job(version, serde_json::json!([])), &masks).unwrap()).0;
             let job = ranges_job(version, serde_json::json!([
-                {"id":"blur","startLayer":1,"endLayer":8,"blendStart":4,"blendEnd":2,
+                {"id":"blur","startLayer":5,"endLayer":6,"blendStart":4,"blendEnd":2,
                  "settings":{"exposureSec":8,"liftHeightMm":8,"liftHeight2Mm":2,"liftSpeedMmMin":120,"lightPwm":0}}
             ]));
             let bytes = direct_ranges_artifact(&job, &masks).unwrap();
@@ -1411,8 +1411,8 @@ mod tests {
             assert_ranges_artifacts_equal(&bytes, &streamed_ranges_artifact(&job, &masks, "rle", None).unwrap());
             let nested = ranges_job(version, serde_json::json!([
                 {"id":"floor","startLayer":1,"endLayer":100,"settings":{"lightPwm":0}},
-                {"id":"middle","startLayer":1,"endLayer":20,"blendStart":2,"settings":{"lightPwm":1}},
-                {"id":"top","startLayer":1,"endLayer":10,"blendStart":2,"settings":{"lightPwm":0}}
+                {"id":"middle","startLayer":3,"endLayer":20,"blendStart":2,"settings":{"lightPwm":1}},
+                {"id":"top","startLayer":3,"endLayer":10,"blendStart":2,"settings":{"lightPwm":0}}
             ]));
             let records = decode_ranges_artifact(&direct_ranges_artifact(&nested, &masks).unwrap()).0;
             assert_eq!(&records[1][62..64], &[0,0]); // .5 then .25, rounded once (not 1 then .5)
@@ -1531,11 +1531,11 @@ mod tests {
             invalid_jobs.push(ranges_job(version, serde_json::json!([
                 {"id":"precise", "startLayer":1,"endLayer":1,"settings":{"liftHeightMm":8.0,"liftHeight2Mm":8.000000000000002}}
             ])));
-            // Both the first and final records are valid; the start ramp first
-            // makes total travel too small on the second physical record.
+            // The core is beyond EOF; its outward start feather first makes
+            // total travel too small on the second physical record.
             invalid_jobs.push(ranges_job(version, serde_json::json!([
-                {"id":"total","startLayer":1,"endLayer":8,"blendStart":4,"blendEnd":4,"settings":{"liftHeightMm":1}},
-                {"id":"stage2","startLayer":1,"endLayer":8,"settings":{"liftHeight2Mm":2}}
+                {"id":"total","startLayer":13,"endLayer":20,"blendStart":12,"settings":{"liftHeightMm":1}},
+                {"id":"stage2","startLayer":1,"endLayer":12,"settings":{"liftHeight2Mm":2}}
             ])));
             for ranges in [
                 serde_json::json!(null),
