@@ -1380,6 +1380,54 @@ mod tests {
     }
 
     #[test]
+    fn goo_layer_settings_ranges_blend_uses_version_baselines_and_final_pwm_rounding() {
+        let masks = ranges_masks();
+        for version in ["v1.2", "v5.1"] {
+            let v5 = version == "v5.1";
+            let baseline = decode_ranges_artifact(&direct_ranges_artifact(
+                &ranges_job(version, serde_json::json!([])), &masks).unwrap()).0;
+            let job = ranges_job(version, serde_json::json!([
+                {"id":"blur","startLayer":1,"endLayer":8,"blendStart":4,"blendEnd":2,
+                 "settings":{"exposureSec":8,"liftHeightMm":8,"liftHeight2Mm":2,"liftSpeedMmMin":120,"lightPwm":0}}
+            ]));
+            let bytes = direct_ranges_artifact(&job, &masks).unwrap();
+            let (records, decoded) = decode_ranges_artifact(&bytes);
+            assert_eq!(decoded, masks);
+            assert_eq!(records[0], baseline[0]); // zero influence preserves legacy stage f32 bits
+            assert_eq!(records[7], baseline[7]);
+            for (index, weight) in [(1,0.25),(2,0.5),(3,0.75),(4,1.0),(5,1.0),(6,0.5)] {
+                let base = f64::from(record_float(&baseline[index], 10, v5));
+                assert_eq!(record_float(&records[index], 10, v5), (base + (8. - base) * weight) as f32);
+                let first = f64::from(record_float(&baseline[index], 30, v5));
+                let second = f64::from(record_float(&baseline[index], 38, v5));
+                let total = first + second + (8. - first - second) * weight;
+                let stage2 = second + (2. - second) * weight;
+                assert_eq!(record_float(&records[index], 30, v5), (total - stage2) as f32);
+                assert_eq!(record_float(&records[index], 38, v5), stage2 as f32);
+                let raw: [u8;2] = records[index][62..64].try_into().unwrap();
+                let pwm = if v5 { u16::from_le_bytes(raw) } else { u16::from_be_bytes(raw) };
+                assert_eq!(pwm, (255.0f64 * (1. - weight)).round() as u16);
+            }
+            assert_ranges_artifacts_equal(&bytes, &streamed_ranges_artifact(&job, &masks, "rle", None).unwrap());
+            let nested = ranges_job(version, serde_json::json!([
+                {"id":"floor","startLayer":1,"endLayer":100,"settings":{"lightPwm":0}},
+                {"id":"middle","startLayer":1,"endLayer":20,"blendStart":2,"settings":{"lightPwm":1}},
+                {"id":"top","startLayer":1,"endLayer":10,"blendStart":2,"settings":{"lightPwm":0}}
+            ]));
+            let records = decode_ranges_artifact(&direct_ranges_artifact(&nested, &masks).unwrap()).0;
+            assert_eq!(&records[1][62..64], &[0,0]); // .5 then .25, rounded once (not 1 then .5)
+            let plain = ranges_job(version, abc_ranges());
+            let mut disabled_ranges = abc_ranges();
+            for range in disabled_ranges.as_array_mut().unwrap() {
+                range["blendStart"] = serde_json::json!(0); range["blendEnd"] = serde_json::json!(0);
+            }
+            let disabled = ranges_job(version, disabled_ranges);
+            assert_ranges_artifacts_equal(&direct_ranges_artifact(&plain, &masks).unwrap(),
+                &direct_ranges_artifact(&disabled, &masks).unwrap());
+        }
+    }
+
+    #[test]
     fn goo_layer_settings_ranges_preserve_baselines_transitions_and_beyond_eof_flags() {
         let masks = ranges_masks();
         for version in ["v1.2", "v5.1"] {
@@ -1482,6 +1530,12 @@ mod tests {
             }
             invalid_jobs.push(ranges_job(version, serde_json::json!([
                 {"id":"precise", "startLayer":1,"endLayer":1,"settings":{"liftHeightMm":8.0,"liftHeight2Mm":8.000000000000002}}
+            ])));
+            // Both the first and final records are valid; the start ramp first
+            // makes total travel too small on the second physical record.
+            invalid_jobs.push(ranges_job(version, serde_json::json!([
+                {"id":"total","startLayer":1,"endLayer":8,"blendStart":4,"blendEnd":4,"settings":{"liftHeightMm":1}},
+                {"id":"stage2","startLayer":1,"endLayer":8,"settings":{"liftHeight2Mm":2}}
             ])));
             for ranges in [
                 serde_json::json!(null),

@@ -4,7 +4,7 @@
 // Reference: /root/GOO_v5_Format_Spec.md (header size 195,492 as validated
 // against real Satellite output; NOT UVtools PR #1129's 195,496).
 use crate::engine::SlicerV3Error;
-use crate::layer_settings::LayerSettingsSchedule;
+use crate::layer_settings::{LayerSettingField, LayerSettingsSchedule};
 use crate::types::SliceJobV3;
 use md5::{Digest, Md5};
 
@@ -122,7 +122,25 @@ fn write_goo_v5_layer_def(
         )
     };
 
-    if let Some(patch) = schedule.patch_at(layer_index as u32) {
+    if let Some(patch) = schedule.resolve_at(layer_index as u32, |field| {
+        use LayerSettingField::*;
+        match field {
+            ExposureSec => f64::from(exposure),
+            LightOffDelaySec => f64::from(light_off),
+            WaitTimeAfterCureSec => f64::from(w_after_cure),
+            WaitTimeAfterLiftSec => f64::from(w_after_lift),
+            WaitTimeBeforeCureSec => f64::from(w_before_cure),
+            LiftHeightMm => f64::from(lift_h) + f64::from(lift_h2),
+            LiftHeight2Mm => f64::from(lift_h2),
+            RetractHeightMm => f64::from(ret_h) + f64::from(ret_h2),
+            RetractHeight2Mm => f64::from(ret_h2),
+            LiftSpeedMmMin => f64::from(lift_s),
+            LiftSpeed2MmMin => f64::from(lift_s2),
+            RetractSpeedMmMin => f64::from(ret_s),
+            RetractSpeed2MmMin => f64::from(ret_s2),
+            LightPwm => f64::from(pwm),
+        }
+    }) {
         if let Some(value) = patch.exposure_sec { exposure = value as f32; }
         if let Some(value) = patch.light_off_delay_sec { light_off = value as f32; }
         if let Some(value) = patch.wait_time_after_cure_sec { w_after_cure = value as f32; }
@@ -134,7 +152,7 @@ fn write_goo_v5_layer_def(
         if let Some(value) = patch.lift_speed2_mm_min { lift_s2 = value as f32; }
         if let Some(value) = patch.retract_speed_mm_min { ret_s = value as f32; }
         if let Some(value) = patch.retract_speed2_mm_min { ret_s2 = value as f32; }
-        if let Some(value) = patch.light_pwm { pwm = value as u16; }
+        if let Some(value) = patch.light_pwm { pwm = value.round() as u16; }
     }
 
     let def_start = out.len();

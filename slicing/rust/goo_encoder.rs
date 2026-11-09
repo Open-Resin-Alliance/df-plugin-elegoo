@@ -2,7 +2,7 @@
 // per-layer records with CRLF delimiters, and an 11-byte footer.
 // Reference: UVtools GooFile (https://github.com/sn4k3/UVtools).
 use crate::engine::SlicerV3Error;
-use crate::layer_settings::{LayerPrintSettingsPatch, LayerSettingsSchedule};
+use crate::layer_settings::{LayerPrintSettingsPatch, LayerSettingField, LayerSettingsSchedule};
 use crate::types::SliceJobV3;
 
 use super::goo_layout::{
@@ -62,16 +62,36 @@ pub(super) fn validate_goo_layer_settings(
     timing: &GooTimingModel,
     schedule: &LayerSettingsSchedule,
 ) -> Result<(), SlicerV3Error> {
-    for segment in schedule.segments() {
-        validate_goo_patch_heights(timing, &segment.settings, segment.start_layer)?;
-        // Motion changes only at the bottom/nonbottom boundary, not transitions.
-        if timing.bottom_layer_count >= segment.start_layer
-            && timing.bottom_layer_count < segment.end_layer
-        {
-            validate_goo_patch_heights(timing, &segment.settings, timing.bottom_layer_count + 1)?;
-        }
-    }
-    Ok(())
+    schedule.validate_heights(timing.bottom_layer_count, |layer_number| {
+        // Only height results are consumed by this preflight. Other fields use
+        // their ordinary record baseline and cannot affect motion validation.
+        let bottom = layer_number <= timing.bottom_layer_count;
+        let patch = schedule.resolve_at(layer_number - 1, |field| {
+            use LayerSettingField::*;
+            match field {
+                LiftHeightMm => if bottom { f64::from(timing.bottom_lift_distance_mm) + f64::from(timing.bottom_lift_distance2_mm) }
+                    else { f64::from(timing.lift_distance_mm) + f64::from(timing.lift_distance2_mm) },
+                RetractHeightMm => if bottom { f64::from(timing.bottom_retract_distance_mm) + f64::from(timing.bottom_retract_distance2_mm) }
+                    else { f64::from(timing.retract_distance_mm) + f64::from(timing.retract_distance2_mm) },
+                _ => f64::from(match field {
+                    ExposureSec => if bottom { timing.bottom_exposure_sec } else { timing.normal_exposure_sec },
+                    LightOffDelaySec => if bottom { timing.bottom_light_off_delay_sec } else { timing.light_off_delay_sec },
+                    WaitTimeBeforeCureSec => if bottom { timing.bottom_wait_time_before_cure_sec } else { timing.wait_time_before_cure_sec },
+                    WaitTimeAfterCureSec => if bottom { timing.bottom_wait_time_after_cure_sec } else { timing.wait_time_after_cure_sec },
+                    WaitTimeAfterLiftSec => if bottom { timing.bottom_wait_time_after_lift_sec } else { timing.wait_time_after_lift_sec },
+                    LiftHeight2Mm => if bottom { timing.bottom_lift_distance2_mm } else { timing.lift_distance2_mm },
+                    RetractHeight2Mm => if bottom { timing.bottom_retract_distance2_mm } else { timing.retract_distance2_mm },
+                    LiftSpeedMmMin => if bottom { timing.bottom_lift_speed_mm_min } else { timing.lift_speed_mm_min },
+                    LiftSpeed2MmMin => if bottom { timing.bottom_lift_speed2_mm_min } else { timing.lift_speed2_mm_min },
+                    RetractSpeedMmMin => if bottom { timing.bottom_retract_speed_mm_min } else { timing.retract_speed_mm_min },
+                    RetractSpeed2MmMin => if bottom { timing.bottom_retract_speed2_mm_min } else { timing.retract_speed2_mm_min },
+                    LightPwm => f32::from(if bottom { timing.bottom_light_pwm } else { timing.light_pwm }),
+                    LiftHeightMm | RetractHeightMm => unreachable!(),
+                }),
+            }
+        }).expect("validation visits compiled range records");
+        validate_goo_patch_heights(timing, &patch, layer_number)
+    })
 }
 
 fn validate_goo_patch_heights(
@@ -299,7 +319,25 @@ fn write_goo_layer(
         )
     };
 
-    if let Some(patch) = schedule.patch_at(layer.index as u32) {
+    if let Some(patch) = schedule.resolve_at(layer.index as u32, |field| {
+        use LayerSettingField::*;
+        match field {
+            ExposureSec => f64::from(exposure),
+            LightOffDelaySec => f64::from(light_off),
+            WaitTimeAfterCureSec => f64::from(w_after_cure),
+            WaitTimeAfterLiftSec => f64::from(w_after_lift),
+            WaitTimeBeforeCureSec => f64::from(w_before_cure),
+            LiftHeightMm => f64::from(lift_h) + f64::from(lift_h2),
+            LiftHeight2Mm => f64::from(lift_h2),
+            RetractHeightMm => f64::from(ret_h) + f64::from(ret_h2),
+            RetractHeight2Mm => f64::from(ret_h2),
+            LiftSpeedMmMin => f64::from(lift_s),
+            LiftSpeed2MmMin => f64::from(lift_s2),
+            RetractSpeedMmMin => f64::from(ret_s),
+            RetractSpeed2MmMin => f64::from(ret_s2),
+            LightPwm => f64::from(pwm),
+        }
+    }) {
         if let Some(value) = patch.exposure_sec { exposure = value as f32; }
         if let Some(value) = patch.light_off_delay_sec { light_off = value as f32; }
         if let Some(value) = patch.wait_time_after_cure_sec { w_after_cure = value as f32; }
@@ -311,7 +349,7 @@ fn write_goo_layer(
         if let Some(value) = patch.lift_speed2_mm_min { lift_s2 = value as f32; }
         if let Some(value) = patch.retract_speed_mm_min { ret_s = value as f32; }
         if let Some(value) = patch.retract_speed2_mm_min { ret_s2 = value as f32; }
-        if let Some(value) = patch.light_pwm { pwm = value as u16; }
+        if let Some(value) = patch.light_pwm { pwm = value.round() as u16; }
     }
 
     let def_start = out.len();
