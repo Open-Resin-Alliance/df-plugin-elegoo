@@ -1219,6 +1219,38 @@ mod tests {
     }
 
     #[test]
+    fn metadata_timing_tilting_mode_is_single_stage_with_bottom_waits() {
+        let meta = r#"{
+            "printer": {
+                "settingsMode": "tilting"
+            },
+            "material": {
+                "layerHeightMm": 0.05,
+                "liftDistance2Mm": 4.5,
+                "liftSpeed2MmMin": 240.0,
+                "retractDistance2Mm": 2.0,
+                "bottomLiftDistance2Mm": 4.0
+            },
+            "goo": {
+                "waitTimeBeforeCureSec": 1.0,
+                "waitTimeAfterCureSec": 0.5,
+                "waitTimeAfterLiftSec": 0.25
+            }
+        }"#;
+
+        let timing = parse_timing_model_from_metadata(meta);
+        assert!((timing.lift_distance2_mm - 0.0).abs() < f32::EPSILON);
+        assert!((timing.lift_speed2_mm_min - 0.0).abs() < f32::EPSILON);
+        assert!((timing.retract_distance2_mm - 0.0).abs() < f32::EPSILON);
+        assert!((timing.bottom_lift_distance2_mm - 0.0).abs() < f32::EPSILON);
+        assert!((timing.retract_distance_mm - 0.05).abs() < f32::EPSILON);
+        assert!((timing.bottom_wait_time_before_cure_sec - 1.0).abs() < f32::EPSILON);
+        assert!((timing.bottom_wait_time_after_cure_sec - 0.5).abs() < f32::EPSILON);
+        assert!((timing.bottom_wait_time_after_lift_sec - 0.25).abs() < f32::EPSILON);
+        assert_eq!(timing.delay_mode, 1);
+    }
+
+    #[test]
     fn metadata_pwm_percent_maps_to_byte_range() {
         let meta = r#"{ "goo": { "projectorPwmPercent": 50.0 } }"#;
         let timing = parse_timing_model_from_metadata(meta);

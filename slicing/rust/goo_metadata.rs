@@ -324,7 +324,9 @@ pub(super) fn parse_timing_model_from_metadata(metadata_json: &str) -> GooTiming
         timing.bottom_retract_speed_mm_min = timing.retract_speed_mm_min;
     }
 
-    if is_simple_mode {
+    // Tilting inherits simple's field set (settings_tilting.diff.json), so it gets
+    // the same single-stage motion and bottom-wait fallback.
+    if is_simple_mode || is_tilting_mode {
         timing.lift_distance2_mm = 0.0;
         timing.lift_speed2_mm_min = 0.0;
         timing.retract_distance2_mm = 0.0;
