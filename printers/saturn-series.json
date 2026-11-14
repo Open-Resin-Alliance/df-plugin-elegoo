@@ -1,13 +1,13 @@
 [
   {
     "presetId": "elegoo-saturn-4-ultra-16k-ctb",
-    "profileVersion": 5,
+    "profileVersion": 6,
     "manufacturer": "ELEGOO",
     "family": "Saturn",
     "name": "Saturn 4 Ultra 16K",
     "imageAssetPath": "./assets/saturn/saturn-4-ultra-16k.png",
     "antiAliasing": true,
-    "hasCamera": false,
+    "hasCamera": true,
     "networkSupport": "sdcp",
     "networkFilter": "Saturn 4",
     "buildVolumeMm": {
@@ -41,7 +41,7 @@
     "name": "Saturn 4 Ultra 16K (GOO)",
     "imageAssetPath": "./assets/saturn/saturn-4-ultra-16k.png",
     "antiAliasing": true,
-    "hasCamera": false,
+    "hasCamera": true,
     "networkSupport": "sdcp",
     "networkFilter": "Saturn 4",
     "buildVolumeMm": {
